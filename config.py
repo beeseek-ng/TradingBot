@@ -40,6 +40,19 @@ class MT5Config:
 
 
 # ---------------------------------------------------------------------------
+# Cloud & Web Dashboard Configuration
+# ---------------------------------------------------------------------------
+@dataclass(frozen=True)
+class WebConfig:
+    """Settings for Cloud/Heroku web dashboard and health monitoring."""
+    PORT: int = int(os.getenv("PORT", "8080"))
+    HOST: str = os.getenv("HOST", "0.0.0.0")
+    ENABLE_DASHBOARD: bool = os.getenv("ENABLE_WEB_DASHBOARD", "true").lower() in ("1", "true", "yes")
+    BOT_MODE: str = os.getenv("BOT_MODE", "auto")
+
+
+
+# ---------------------------------------------------------------------------
 # Global Risk Management Configuration
 # ---------------------------------------------------------------------------
 @dataclass(frozen=True)

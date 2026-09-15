@@ -47,17 +47,23 @@ The bot operates without lagging indicators, executing purely on price action, i
 
 ```
 Trading_Bot/
-├── data/                  # Historical M15 CSV data (EURUSD, GBPUSD, XAUUSD)
-├── logs/                  # Real-time execution logs (bot_activity.log)
-├── config.py              # Account credentials, lot sizes, risk & SL/TP settings
-├── strategy.py            # SLK, CRT, Market Classifier, and signal generation
-├── backtester.py          # Multi-timeframe zero-lookahead backtest engine
-├── main.py                # Live orchestration engine (supports MT5 & Paper trading)
-├── run_live_wine.sh       # One-click launcher for MT5 running under Wine on Linux
-├── test_forex_bot.py      # Automated pytest suite (pip math, risk, CRT, SLK)
-├── COMMANDS.md            # Quick CLI cheatsheet
-├── requirements.txt       # Python dependencies
-└── README.md              # Documentation & User Guide
+├── data/                      # Historical M15 CSV data (EURUSD, GBPUSD, XAUUSD)
+├── logs/                      # Real-time execution logs (bot_activity.log)
+├── config.py                  # Account credentials, lot sizes, risk & SL/TP settings
+├── strategy.py                # SLK, CRT, Market Classifier, and signal generation
+├── backtester.py              # Multi-timeframe zero-lookahead backtest engine
+├── main.py                    # Live orchestration engine (supports MT5 & Paper trading)
+├── web_server.py              # Live HTML status dashboard & Heroku $PORT health endpoint
+├── run_live_wine.sh           # One-click launcher for MT5 running under Wine on Linux
+├── test_forex_bot.py          # Automated pytest suite (pip math, risk, CRT, SLK)
+├── Dockerfile                 # Production headless multi-stage container
+├── docker-compose.yml         # Local Docker testing for live & paper trading
+├── heroku.yml                 # Heroku container deployment manifest
+├── entrypoint.sh              # Container bootstrap and process manager
+├── HEROKU_DEPLOYMENT_GUIDE.md # Complete step-by-step Heroku deployment tutorial
+├── COMMANDS.md                # Quick CLI cheatsheet
+├── requirements.txt           # Python dependencies
+└── README.md                  # Documentation & User Guide
 ```
 
 ---
@@ -130,12 +136,51 @@ python main.py --mode live
 
 ---
 
-## 📝 Monitoring Live Logs
+## 🐳 Docker & Heroku Cloud Deployment
 
-To watch real-time signals, candle closures, and order fills as they happen:
+### 1. Quick Deploy to Heroku
+ForexBot is fully Dockerized and ready for 1-click cloud deployment to Heroku using `heroku.yml`:
+
 ```bash
-tail -f logs/bot_activity.log
+# 1. Create a new Heroku container app:
+heroku create my-forex-bot
+heroku stack:set container
+
+# 2. Set your MT5 credentials & parameters:
+heroku config:set BOT_MODE=live MT5_LOGIN=5055872290 MT5_PASSWORD=RhPwCr*0 MT5_SERVER=MetaQuotes-Demo
+
+# 3. Deploy to Heroku:
+git push heroku main
+heroku ps:scale web=1
+
+# 4. Open Live Web Dashboard:
+heroku open
 ```
+*(For complete step-by-step instructions, see the [HEROKU_DEPLOYMENT_GUIDE.md](file:///home/solodev/Documents/Trading_Bot/HEROKU_DEPLOYMENT_GUIDE.md)).*
+
+---
+
+### 2. Run with Docker Locally
+```bash
+# Start real-time paper trading container with Web Dashboard:
+docker compose up --build forexbot-paper
+
+# Access Web Dashboard at:
+# http://localhost:8080/
+```
+
+---
+
+## 📝 Monitoring Live Logs & Dashboard
+
+- **Terminal Logs**:
+  ```bash
+  tail -f logs/bot_activity.log
+  # Or on Heroku:
+  heroku logs --tail
+  ```
+- **Web Dashboard**: Access `http://localhost:8080/` (or `https://your-app.herokuapp.com/`) to view live balance, equity, daily drawdown, open positions, and latest signals.
+
 
 ---
 

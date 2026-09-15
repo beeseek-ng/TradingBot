@@ -94,3 +94,36 @@ Run the full automated test suite (verifying pip math, risk management, CRT swee
 ```bash
 .venv/bin/pytest -v
 ```
+
+---
+
+## 🐳 5. Docker & Heroku Deployment Commands
+
+### A. Run with Docker Compose:
+```bash
+# Paper trading simulation with Web Dashboard on http://localhost:8080:
+docker compose up --build forexbot-paper
+
+# Live MT5 trading mode:
+docker compose --profile live up --build forexbot-live
+```
+
+### B. Deploy to Heroku:
+```bash
+# 1. Create app and set container stack:
+heroku create my-forex-bot
+heroku stack:set container
+
+# 2. Set credentials:
+heroku config:set BOT_MODE=live MT5_LOGIN=5055872290 MT5_PASSWORD=RhPwCr*0 MT5_SERVER=MetaQuotes-Demo
+
+# 3. Deploy and scale:
+git push heroku main
+heroku ps:scale web=1
+
+# 4. View logs & open live dashboard:
+heroku logs --tail
+heroku open
+```
+*(For complete details, see [HEROKU_DEPLOYMENT_GUIDE.md](file:///home/solodev/Documents/Trading_Bot/HEROKU_DEPLOYMENT_GUIDE.md)).*
+

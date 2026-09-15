@@ -1,0 +1,43 @@
+# ==============================================================================
+# ForexBot Docker Compose (Local Testing & Multi-Container Setup)
+# ==============================================================================
+
+version: '3.8'
+
+services:
+  # Service 1: Real-Time Paper Trading & Web Dashboard
+  forexbot-paper:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: forexbot_paper
+    environment:
+      - BOT_MODE=paper
+      - PORT=8080
+      - ENABLE_WEB_DASHBOARD=true
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./logs:/app/logs
+    restart: unless-stopped
+
+  # Service 2: Live MetaTrader 5 Headless Trading (Wine + MT5)
+  forexbot-live:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: forexbot_live
+    environment:
+      - BOT_MODE=live
+      - MT5_LOGIN=${MT5_LOGIN:-5055872290}
+      - MT5_PASSWORD=${MT5_PASSWORD:-RhPwCr*0}
+      - MT5_SERVER=${MT5_SERVER:-MetaQuotes-Demo}
+      - PORT=8081
+      - ENABLE_WEB_DASHBOARD=true
+    ports:
+      - "8081:8081"
+    volumes:
+      - ./logs:/app/logs
+    restart: unless-stopped
+    profiles:
+      - live

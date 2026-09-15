@@ -1,0 +1,12 @@
+# ==============================================================================
+# Heroku Container Deployment Manifest (heroku.yml)
+# ==============================================================================
+
+build:
+  docker:
+    web: Dockerfile
+    worker: Dockerfile
+
+run:
+  web: /app/entrypoint.sh
+  worker: /app/entrypoint.sh

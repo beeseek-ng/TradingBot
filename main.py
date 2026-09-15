@@ -38,8 +38,10 @@ from config import (
     RiskConfig,
     StrategyConfig,
     SymbolSpec,
+    WebConfig,
 )
 from strategy import PriceActionStrategy, SignalType, TradeSignal
+import web_server
 
 # Try importing native MetaTrader5
 try:
@@ -660,7 +662,13 @@ class ForexBot:
     """
 
     def __init__(self, mode: str = "auto"):
-        self.mode = mode
+        self.web_config = WebConfig()
+        # Prefer explicit mode arg, otherwise fallback to BOT_MODE environment variable
+        if mode == "auto" and self.web_config.BOT_MODE != "auto":
+            self.mode = self.web_config.BOT_MODE
+        else:
+            self.mode = mode
+
         self.mt5_config = MT5Config()
         self.risk_config = RiskConfig()
         self.strategy_config = StrategyConfig()
@@ -695,12 +703,21 @@ class ForexBot:
         logger.info(f"     STARTING FOREXBOT ENGINE [{mode_label}]     ")
         logger.info("==================================================")
 
+        # Launch Web Dashboard for Heroku and Cloud monitoring if enabled or PORT is set
+        if self.web_config.ENABLE_DASHBOARD or os.getenv("PORT"):
+            try:
+                web_server.start_web_server(port=self.web_config.PORT, host=self.web_config.HOST)
+            except Exception as ex:
+                logger.warning(f"Could not start web dashboard on port {self.web_config.PORT}: {ex}")
+
         if not self.client.connect():
             logger.error("Initial connection failed. Exiting.")
+            web_server.update_web_status(status="CONNECTION_FAILED", mode="PAPER" if self.is_paper else "LIVE")
             return False
 
         equity, balance = self.client.get_account_equity_and_balance()
         self.prop_guard.update_daily_baseline(balance)
+        web_server.update_web_status(status="RUNNING", mode="PAPER" if self.is_paper else "LIVE", balance=balance, equity=equity)
 
         for sym in SUPPORTED_SYMBOLS:
             self.client.subscribe_symbol(sym)
@@ -737,6 +754,12 @@ class ForexBot:
             return
 
         logger.info(f"[{symbol}] 🎯 SIGNAL DETECTED: {signal.signal.value} | {signal.rationale}")
+        web_server.update_web_status(last_signal={
+            "symbol": symbol,
+            "type": signal.signal.value,
+            "price": signal.entry_price,
+            "reason": signal.rationale
+        })
 
         equity, _ = self.client.get_account_equity_and_balance()
         mt5_sym_info = self.client.get_symbol_info(symbol)
@@ -764,6 +787,7 @@ class ForexBot:
                 if not self.prop_guard.check_equity(equity):
                     self.executor.emergency_liquidate_all()
                     logger.critical("Bot terminated by Prop Firm Guardrail.")
+                    web_server.update_web_status(status="KILL_SWITCH_ACTIVE")
                     break
 
                 for symbol in SUPPORTED_SYMBOLS:
@@ -772,8 +796,24 @@ class ForexBot:
                     except Exception as ex:
                         logger.exception(f"Error processing {symbol}: {ex}")
 
+                # Update live web status
+                open_pos = self.executor.get_open_positions()
+                pos_data = []
+                for p in open_pos:
+                    pos_data.append({
+                        "ticket": getattr(p, "ticket", p.get("ticket") if isinstance(p, dict) else None),
+                        "symbol": getattr(p, "symbol", p.get("symbol") if isinstance(p, dict) else None),
+                        "type": getattr(p, "type", p.get("type") if isinstance(p, dict) else 0),
+                        "volume": getattr(p, "volume", p.get("volume") if isinstance(p, dict) else 0.0),
+                        "price_open": getattr(p, "price_open", p.get("price_open") if isinstance(p, dict) else 0.0),
+                        "sl": getattr(p, "sl", p.get("sl") if isinstance(p, dict) else None),
+                        "tp": getattr(p, "tp", p.get("tp") if isinstance(p, dict) else None),
+                    })
+                baseline = self.prop_guard.starting_daily_balance
+                dd_pct = ((baseline - equity) / baseline * 100.0) if baseline > 0 else 0.0
+                web_server.update_web_status(balance=balance, equity=equity, daily_dd_pct=max(0.0, dd_pct), open_positions=pos_data)
+
                 iteration += 1
-                # If running paper trading simulation, poll every 1 second
                 time.sleep(1.0)
 
         except Exception as ex:
@@ -783,6 +823,7 @@ class ForexBot:
 
     def shutdown(self) -> None:
         logger.info("Performing clean shutdown...")
+        web_server.update_web_status(status="STOPPED")
         self.client.disconnect()
         logger.info("ForexBot stopped.")
 
