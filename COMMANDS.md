@@ -99,9 +99,15 @@ Run the full automated test suite (verifying pip math, risk management, CRT swee
 
 ## 🐳 5. Docker & Heroku Deployment Commands
 
-### A. Build the Docker Image:
+> [!TIP]
+> **Docker Permissions**: If you see `permission denied while connecting to docker API`, either prefix commands with `sudo` (e.g. `sudo docker ...`) or grant your user permission once by running:
+> ```bash
+> sudo usermod -aG docker $USER && newgrp docker
+> ```
+
+### A. Build the Docker Image (Required First):
 ```bash
-docker build -t forexbot:latest .
+sudo docker build -t forexbot:latest .
 ```
 
 ### B. Run with Standard Docker:
