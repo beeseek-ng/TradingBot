@@ -99,13 +99,42 @@ Run the full automated test suite (verifying pip math, risk management, CRT swee
 
 ## 🐳 5. Docker & Heroku Deployment Commands
 
-### A. Run with Docker Compose:
+### A. Build the Docker Image:
 ```bash
-# Paper trading simulation with Web Dashboard on http://localhost:8080:
-docker compose up --build forexbot-paper
+docker build -t forexbot:latest .
+```
 
-# Live MT5 trading mode:
-docker compose --profile live up --build forexbot-live
+### B. Run with Standard Docker:
+```bash
+# 1. Live MT5 Trading Mode (with Web Dashboard on http://localhost:8080):
+docker run -d --name forexbot_live -p 8080:8080 \
+  -e BOT_MODE=live \
+  -e MT5_LOGIN=5055872290 \
+  -e MT5_PASSWORD=RhPwCr*0 \
+  -e MT5_SERVER=MetaQuotes-Demo \
+  -v $(pwd)/logs:/app/logs \
+  forexbot:latest
+
+# 2. Paper Trading Simulation Mode (with Web Dashboard on http://localhost:8080):
+docker run -d --name forexbot_paper -p 8080:8080 \
+  -e BOT_MODE=paper \
+  -v $(pwd)/logs:/app/logs \
+  forexbot:latest
+
+# 3. View Live Container Logs:
+docker logs -f forexbot_live   # or forexbot_paper
+
+# 4. Stop and Remove Container:
+docker stop forexbot_live && docker rm forexbot_live
+```
+
+### C. Run with Docker Compose (if docker-compose is installed):
+```bash
+# Paper trading:
+docker-compose up --build forexbot-paper
+
+# Live MT5 trading:
+docker-compose up --build forexbot-live
 ```
 
 ### B. Deploy to Heroku:
