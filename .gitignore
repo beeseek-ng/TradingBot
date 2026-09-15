@@ -1,0 +1,32 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+
+# Virtual Environments
+.venv/
+venv/
+ENV/
+env/
+
+# Logs & Runtime Artefacts
+logs/*.log
+!logs/.gitkeep
+*.log
+
+# Pytest / Cache
+.pytest_cache/
+.coverage
+htmlcov/
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Temporary files
+/tmp/
