@@ -228,8 +228,10 @@ class Backtester:
         trade_counter = 0
 
         lookback = self.strategy.config.SWING_LOOKBACK
-        sl_dist = spec.pips_to_price_delta(self.strategy.config.STOP_LOSS_PIPS)
-        tp_dist = spec.pips_to_price_delta(self.strategy.config.TAKE_PROFIT_PIPS)
+        sl_pips = self.strategy.config.get_sl_pips(symbol)
+        tp_pips = self.strategy.config.get_tp_pips(symbol)
+        sl_dist = spec.pips_to_price_delta(sl_pips)
+        tp_dist = spec.pips_to_price_delta(tp_pips)
         spread_delta = spec.pips_to_price_delta(self.spread_pips)
         slippage_delta = spec.pips_to_price_delta(self.slippage_pips)
 
@@ -245,7 +247,7 @@ class Backtester:
             d1_df = None
             w1_df = None
 
-        print(f"[*] Simulating {len(df):,} candles with SLK & CRT rules (Fixed SL: {self.strategy.config.STOP_LOSS_PIPS}p, TP: {self.strategy.config.TAKE_PROFIT_PIPS}p)...")
+        print(f"[*] Simulating {len(df):,} candles with SLK & CRT rules (Fixed SL: {sl_pips}p, TP: {tp_pips}p, Lot: {spec.fixed_lot})...")
 
         # Step through candles sequentially
         for i in range(lookback + 5, len(df)):
@@ -534,7 +536,7 @@ class Backtester:
             ["Max Drawdown (%)", f"{result.max_drawdown_pct:.2f}%"],
             ["Sharpe Ratio", f"{result.sharpe_ratio:.2f}"],
             ["Session Distribution", f"London: {result.london_trades} | New York: {result.ny_trades}"],
-            ["Stop Loss / Take Profit", f"{self.strategy.config.STOP_LOSS_PIPS} pips / {self.strategy.config.TAKE_PROFIT_PIPS} pips (1:3 RR)"],
+            ["Stop Loss / Take Profit", f"{self.strategy.config.get_sl_pips(result.symbol)} pips / {self.strategy.config.get_tp_pips(result.symbol)} pips (1:3 RR)"],
         ]
 
         print("\n" + "=" * 65)

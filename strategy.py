@@ -535,9 +535,13 @@ class PriceActionStrategy:
         v_levels = self.key_detector.find_v_shape_levels(data, lookback=40)
         fvgs = self.key_detector.find_fair_value_gaps(data, min_pips=self.config.MIN_FVG_PIPS, spec=spec, lookback=25)
 
-        sl_dist = spec.pips_to_price_delta(self.config.STOP_LOSS_PIPS)
-        tp1_dist = spec.pips_to_price_delta(self.config.TAKE_PROFIT_PIPS)
-        tp2_dist = spec.pips_to_price_delta(self.config.TAKE_PROFIT_2_PIPS)
+        sl_pips = self.config.get_sl_pips(symbol)
+        tp1_pips = self.config.get_tp_pips(symbol)
+        tp2_pips = self.config.get_tp2_pips(symbol)
+
+        sl_dist = spec.pips_to_price_delta(sl_pips)
+        tp1_dist = spec.pips_to_price_delta(tp1_pips)
+        tp2_dist = spec.pips_to_price_delta(tp2_pips)
 
         # LTF Liquidity Sweep Check on current completed candle
         ltf_crt = self.crt_engine.evaluate_crt(data, timeframe_name=self.config.TIMEFRAME_NAME)
@@ -577,10 +581,10 @@ class PriceActionStrategy:
                         entry_price=entry_p,
                         stop_loss=sl_p,
                         take_profit=tp1_p,
-                        sl_pips=self.config.STOP_LOSS_PIPS,
-                        tp_pips=self.config.TAKE_PROFIT_PIPS,
+                        sl_pips=sl_pips,
+                        tp_pips=tp1_pips,
                         tp2_price=tp2_p,
-                        tp2_pips=self.config.TAKE_PROFIT_2_PIPS,
+                        tp2_pips=tp2_pips,
                         lot_size=lot_size,
                         rationale=(
                             f"SLK Bullish Execution [{session_name}]: Disrespected A-Shape Resistance "
@@ -631,10 +635,10 @@ class PriceActionStrategy:
                         entry_price=entry_p,
                         stop_loss=sl_p,
                         take_profit=tp1_p,
-                        sl_pips=self.config.STOP_LOSS_PIPS,
-                        tp_pips=self.config.TAKE_PROFIT_PIPS,
+                        sl_pips=sl_pips,
+                        tp_pips=tp1_pips,
                         tp2_price=tp2_p,
-                        tp2_pips=self.config.TAKE_PROFIT_2_PIPS,
+                        tp2_pips=tp2_pips,
                         lot_size=lot_size,
                         rationale=(
                             f"SLK Bearish Execution [{session_name}]: Disrespected V-Shape Support "
@@ -670,10 +674,10 @@ class PriceActionStrategy:
                     entry_price=entry_p,
                     stop_loss=sl_p,
                     take_profit=tp1_p,
-                    sl_pips=self.config.STOP_LOSS_PIPS,
-                    tp_pips=self.config.TAKE_PROFIT_PIPS,
+                    sl_pips=sl_pips,
+                    tp_pips=tp1_pips,
                     tp2_price=tp2_p,
-                    tp2_pips=self.config.TAKE_PROFIT_2_PIPS,
+                    tp2_pips=tp2_pips,
                     lot_size=lot_size,
                     rationale=f"CRT Bullish Sweep [{session_name}]: Low swept ({ltf_crt.swept_level:.{spec.digits}f}) with close inside range. Storyline: {storyline.rationale}",
                     storyline=storyline,
@@ -692,10 +696,10 @@ class PriceActionStrategy:
                     entry_price=entry_p,
                     stop_loss=sl_p,
                     take_profit=tp1_p,
-                    sl_pips=self.config.STOP_LOSS_PIPS,
-                    tp_pips=self.config.TAKE_PROFIT_PIPS,
+                    sl_pips=sl_pips,
+                    tp_pips=tp1_pips,
                     tp2_price=tp2_p,
-                    tp2_pips=self.config.TAKE_PROFIT_2_PIPS,
+                    tp2_pips=tp2_pips,
                     lot_size=lot_size,
                     rationale=f"CRT Bearish Sweep [{session_name}]: High swept ({ltf_crt.swept_level:.{spec.digits}f}) with close inside range. Storyline: {storyline.rationale}",
                     storyline=storyline,
@@ -718,6 +722,9 @@ class PriceActionStrategy:
         storyline: Optional[MarketStoryline] = None
     ) -> TradeSignal:
         """Helper to create a neutral HOLD signal."""
+        sl_pips = self.config.get_sl_pips(symbol)
+        tp_pips = self.config.get_tp_pips(symbol)
+        tp2_pips = self.config.get_tp2_pips(symbol)
         return TradeSignal(
             symbol=symbol,
             signal=SignalType.HOLD,
@@ -725,10 +732,10 @@ class PriceActionStrategy:
             entry_price=close,
             stop_loss=0.0,
             take_profit=0.0,
-            sl_pips=self.config.STOP_LOSS_PIPS,
-            tp_pips=self.config.TAKE_PROFIT_PIPS,
+            sl_pips=sl_pips,
+            tp_pips=tp_pips,
             tp2_price=0.0,
-            tp2_pips=self.config.TAKE_PROFIT_2_PIPS,
+            tp2_pips=tp2_pips,
             lot_size=lot_size,
             rationale=rationale,
             storyline=storyline,

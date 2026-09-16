@@ -10,38 +10,38 @@ The backtesting engine is pure Python, operates on your CSV data, and works **10
 
 ### A. Run Backtest Across All Pairs
 ```bash
-.venv/bin/python backtester.py --symbol ALL --lotsize fixed --tp 150 --sl 50
+.venv/bin/python backtester.py --symbol ALL --lotsize fixed
 ```
 
 ### B. Run Backtest on Specific Symbols
 
-#### 1. Gold (XAUUSD) — Fixed 0.02 Lots
+#### 1. Gold (XAUUSD) — Fixed 0.02 Lots (50-pip SL = $10 Risk, 150-pip TP = $30 Reward)
 ```bash
-.venv/bin/python backtester.py --symbol XAUUSD --lotsize fixed --tp 150 --sl 50
+.venv/bin/python backtester.py --symbol XAUUSD --lotsize fixed
 ```
 
-#### 2. British Pound (GBPUSD) — Fixed 0.05 Lots
+#### 2. British Pound (GBPUSD) — Fixed 0.10 Lots (10-pip SL = $10 Risk, 30-pip TP = $30 Reward)
 ```bash
-# Standard 1:3 Risk-to-Reward (150 pips Take Profit)
-.venv/bin/python backtester.py --symbol GBPUSD --lotsize fixed --tp 150 --sl 50
+# Standard 1:3 Risk-to-Reward (30 pips Take Profit)
+.venv/bin/python backtester.py --symbol GBPUSD --lotsize fixed
 
-# Extended 1:5 Risk-to-Reward (250 pips Take Profit runner)
-.venv/bin/python backtester.py --symbol GBPUSD --lotsize fixed --tp 250 --sl 50
+# Extended 1:5 Risk-to-Reward (50 pips Take Profit runner)
+.venv/bin/python backtester.py --symbol GBPUSD --lotsize fixed --tp 50 --sl 10
 ```
 
-#### 3. Euro (EURUSD) — Fixed 0.05 Lots
+#### 3. Euro (EURUSD) — Fixed 0.10 Lots (10-pip SL = $10 Risk, 30-pip TP = $30 Reward)
 ```bash
-.venv/bin/python backtester.py --symbol EURUSD --lotsize fixed --tp 150 --sl 50
+.venv/bin/python backtester.py --symbol EURUSD --lotsize fixed
 ```
 
 ### C. Useful Backtest Options & Flags
 | Flag | Description | Default | Example |
 | :--- | :--- | :--- | :--- |
 | `--symbol` | Symbol to test (`ALL`, `EURUSD`, `GBPUSD`, `XAUUSD`) | `ALL` | `--symbol GBPUSD` |
-| `--balance` | Initial simulated balance ($) | `10000.0` | `--balance 50000` |
-| `--tp` | Take Profit target in pips | `150.0` | `--tp 250` |
-| `--sl` | Stop Loss in pips | `50.0` | `--sl 50` |
-| `--lotsize` | `fixed` (0.05 FX / 0.02 Gold) or `dynamic` (1% risk) | `fixed` | `--lotsize dynamic` |
+| `--balance` | Initial simulated balance ($) | `10000.0` | `--balance 147` |
+| `--tp` | Take Profit target in pips | Symbol default (30p FX / 150p Gold) | `--tp 50` |
+| `--sl` | Stop Loss in pips | Symbol default (10p FX / 50p Gold) | `--sl 10` |
+| `--lotsize` | `fixed` (0.10 FX / 0.02 Gold) or `dynamic` (1% risk) | `fixed` | `--lotsize dynamic` |
 | `--csv` | Custom historical CSV path | Automatic | `--csv data/custom.csv` |
 
 ---

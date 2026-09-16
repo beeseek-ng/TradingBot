@@ -78,8 +78,8 @@ class RiskConfig:
 
     # Default fixed lot sizing as requested by strategy spec
     DEFAULT_FIXED_LOTS: Dict[str, float] = field(default_factory=lambda: {
-        "EURUSD": 0.05,
-        "GBPUSD": 0.05,
+        "EURUSD": 0.10,
+        "GBPUSD": 0.10,
         "XAUUSD": 0.02,
     })
 
@@ -101,7 +101,10 @@ class SymbolSpec:
     min_lot: float = 0.01    # Broker minimum volume
     max_lot: float = 100.0   # Broker maximum volume
     lot_step: float = 0.01   # Volume increment step
-    fixed_lot: float = 0.05  # Default fixed lot size for user strategy
+    fixed_lot: float = 0.10  # Default fixed lot size for user strategy
+    default_sl_pips: float = 10.0   # Tight Stop Loss in pips (e.g. 10 pips = $10 on 0.10 lots)
+    default_tp_pips: float = 30.0   # 1:3 RR Take Profit (30 pips = $30 on 0.10 lots)
+    default_tp2_pips: float = 50.0  # 1:5 RR Runner (50 pips = $50 on 0.10 lots)
     
     @property
     def points_per_pip(self) -> float:
@@ -132,7 +135,10 @@ SUPPORTED_SYMBOLS: Dict[str, SymbolSpec] = {
         min_lot=0.01,
         max_lot=100.0,
         lot_step=0.01,
-        fixed_lot=0.05
+        fixed_lot=0.10,
+        default_sl_pips=10.0,       # 10 pips * 0.10 lot = $10.00 Risk
+        default_tp_pips=30.0,       # 30 pips * 0.10 lot = $30.00 Reward (1:3 RR)
+        default_tp2_pips=50.0       # 50 pips * 0.10 lot = $50.00 Reward (1:5 RR)
     ),
     "GBPUSD": SymbolSpec(
         symbol="GBPUSD",
@@ -143,7 +149,10 @@ SUPPORTED_SYMBOLS: Dict[str, SymbolSpec] = {
         min_lot=0.01,
         max_lot=100.0,
         lot_step=0.01,
-        fixed_lot=0.05
+        fixed_lot=0.10,
+        default_sl_pips=10.0,       # 10 pips * 0.10 lot = $10.00 Risk
+        default_tp_pips=30.0,       # 30 pips * 0.10 lot = $30.00 Reward (1:3 RR)
+        default_tp2_pips=50.0       # 50 pips * 0.10 lot = $50.00 Reward (1:5 RR)
     ),
     "XAUUSD": SymbolSpec(
         symbol="XAUUSD",
@@ -154,7 +163,10 @@ SUPPORTED_SYMBOLS: Dict[str, SymbolSpec] = {
         min_lot=0.01,
         max_lot=50.0,
         lot_step=0.01,
-        fixed_lot=0.02
+        fixed_lot=0.02,
+        default_sl_pips=50.0,       # 50 pips * 0.02 lot = $10.00 Risk
+        default_tp_pips=150.0,      # 150 pips * 0.02 lot = $30.00 Reward (1:3 RR)
+        default_tp2_pips=250.0      # 250 pips * 0.02 lot = $50.00 Reward (1:5 RR)
     ),
 }
 
@@ -205,13 +217,13 @@ class StrategyConfig:
     TIMEFRAME_NAME: str = "M15"
     TIMEFRAME_MINUTES: int = 15
 
-    # Risk-to-Reward Parameters
-    STOP_LOSS_PIPS: float = 50.0       # Fixed 50 pips risk per trade
-    TAKE_PROFIT_PIPS: float = 150.0    # Fixed 150 pips target (1:3 RR)
-    TAKE_PROFIT_2_PIPS: float = 250.0  # Optional 250 pips runner/extended target (1:5 RR)
+    # Global Risk-to-Reward Fallbacks
+    STOP_LOSS_PIPS: float = 50.0       # Fallback Stop Loss in pips
+    TAKE_PROFIT_PIPS: float = 150.0    # Fallback Take Profit (1:3 RR)
+    TAKE_PROFIT_2_PIPS: float = 250.0  # Fallback Take Profit 2 (1:5 RR)
     
     # Sizing Mode
-    USE_FIXED_LOT_SIZING: bool = True  # If True: EURUSD/GBPUSD=0.05, XAUUSD=0.02
+    USE_FIXED_LOT_SIZING: bool = True  # If True: EURUSD/GBPUSD=0.10, XAUUSD=0.02
 
     # Historical Bars Lookback
     BARS_LOOKBACK: int = 100
@@ -233,6 +245,25 @@ class StrategyConfig:
     
     # CRT (Candle Range Theory) Parameters
     CRT_SWEEP_TOLERANCE_RATIO: float = 0.05 # Minimum sweep beyond previous candle extreme
+
+    def get_sl_pips(self, symbol: str) -> float:
+        """Returns symbol-specific Stop Loss in pips (10 pips FX, 50 pips Gold)."""
+        if symbol in SUPPORTED_SYMBOLS:
+            return SUPPORTED_SYMBOLS[symbol].default_sl_pips
+        return self.STOP_LOSS_PIPS
+
+    def get_tp_pips(self, symbol: str) -> float:
+        """Returns symbol-specific Take Profit in pips (30 pips FX, 150 pips Gold)."""
+        if symbol in SUPPORTED_SYMBOLS:
+            return SUPPORTED_SYMBOLS[symbol].default_tp_pips
+        return self.TAKE_PROFIT_PIPS
+
+    def get_tp2_pips(self, symbol: str) -> float:
+        """Returns symbol-specific extended Take Profit 2 in pips."""
+        if symbol in SUPPORTED_SYMBOLS:
+            return SUPPORTED_SYMBOLS[symbol].default_tp2_pips
+        return self.TAKE_PROFIT_2_PIPS
+
 
 
 # ---------------------------------------------------------------------------

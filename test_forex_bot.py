@@ -68,12 +68,12 @@ def test_risk_manager_lot_sizing():
     gbpusd = SUPPORTED_SYMBOLS["GBPUSD"]
     xauusd = SUPPORTED_SYMBOLS["XAUUSD"]
 
-    # Fixed lot sizing as requested
-    assert risk_mgr.calculate_lot_size(10000.0, 50.0, eurusd, use_fixed=True) == 0.05
-    assert risk_mgr.calculate_lot_size(10000.0, 50.0, gbpusd, use_fixed=True) == 0.05
+    # Fixed lot sizing as configured
+    assert risk_mgr.calculate_lot_size(10000.0, 10.0, eurusd, use_fixed=True) == 0.10
+    assert risk_mgr.calculate_lot_size(10000.0, 10.0, gbpusd, use_fixed=True) == 0.10
     assert risk_mgr.calculate_lot_size(10000.0, 50.0, xauusd, use_fixed=True) == 0.02
 
-    # Dynamic lot sizing mode (1% equity risk on 50 pips)
+    # Dynamic lot sizing mode (1% equity risk = $100 on 50 pips)
     lot_eur_dyn = risk_mgr.calculate_lot_size(10000.0, 50.0, eurusd, use_fixed=False)
     assert lot_eur_dyn == 0.20
 

@@ -36,10 +36,9 @@ The bot operates without lagging indicators, executing purely on price action, i
 ### 3. Execution Rules
 - **Execution Timeframes**: 2H, 1H, and 15M (M15 trigger).
 - **Session Timings**: Active only during **London (`07:00 - 12:00 UTC`)** and **New York (`12:00 - 20:00 UTC`)**.
-- **Risk / Reward**:
-  - Stop Loss: **50.0 pips**.
-  - Take Profit: **150.0 pips** (1:3 RR) or **250.0 pips** (1:5 RR runner).
-  - Lot Sizes: `0.05` for EURUSD/GBPUSD, `0.02` for XAUUSD (or dynamic 1% risk).
+- **Risk / Reward & Lot Sizing**:
+  - **EURUSD & GBPUSD**: `0.10` lots | **10.0 pips SL** ($10.00 risk) | **30.0 pips TP** ($30.00 reward, 1:3 RR) | **50.0 pips TP2** ($50.00 reward, 1:5 RR).
+  - **XAUUSD (Gold)**: `0.02` lots | **50.0 pips SL** ($10.00 risk) | **150.0 pips TP** ($30.00 reward, 1:3 RR) | **250.0 pips TP2** ($50.00 reward, 1:5 RR).
 
 ---
 
