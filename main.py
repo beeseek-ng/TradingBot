@@ -541,6 +541,33 @@ class OrderExecutor:
         sl_price = spec.round_price(price - sl_dist if signal.signal == SignalType.BUY else price + sl_dist)
         tp_price = spec.round_price(price + tp_dist if signal.signal == SignalType.BUY else price - tp_dist)
 
+        # Margin Validation & Automatic Volume Downsizing for Capital Safety
+        acc_info = mt5.account_info()
+        if acc_info is not None:
+            free_margin = getattr(acc_info, "margin_free", 0.0)
+            if free_margin is not None and free_margin > 0:
+                calc_margin = mt5.order_calc_margin(order_type, signal.symbol, lot_size, price)
+                if calc_margin is not None and calc_margin > (free_margin * 0.85):
+                    safe_budget = free_margin * 0.75
+                    single_lot_margin = mt5.order_calc_margin(order_type, signal.symbol, 1.0, price)
+                    if single_lot_margin and single_lot_margin > 0:
+                        max_affordable_lots = safe_budget / single_lot_margin
+                        steps = math.floor(max_affordable_lots / spec.lot_step)
+                        downsized_lot = round(steps * spec.lot_step, 2)
+                        if downsized_lot >= spec.min_lot:
+                            logger.warning(
+                                f"[{signal.symbol}] Margin Protection: {lot_size} lots requires ${calc_margin:.2f} "
+                                f"(Free Margin: ${free_margin:.2f}). Auto-adjusting volume to {downsized_lot} lots."
+                            )
+                            lot_size = downsized_lot
+                        else:
+                            min_margin = single_lot_margin * spec.min_lot
+                            logger.error(
+                                f"[{signal.symbol}] Insufficient Free Margin: ${free_margin:.2f} available, "
+                                f"minimum {spec.min_lot} lots requires ${min_margin:.2f}. Skipping trade safely."
+                            )
+                            return False
+
         default_filling = self._determine_filling_mode(signal.symbol)
         request = {
             "action": mt5.TRADE_ACTION_DEAL,
@@ -580,6 +607,19 @@ class OrderExecutor:
                 elif result and result.retcode == 10030:  # Unsupported filling mode
                     logger.warning(f"Filling mode {fm} unsupported for {signal.symbol}, attempting next filling mode...")
                     continue
+                elif result and result.retcode == 10019:  # No money (Insufficient Free Margin)
+                    logger.warning(f"Broker returned retcode 10019 (No money) for {request['volume']} lots {signal.symbol}.")
+                    # Attempt automated fallback to smaller volume
+                    reduced_vol = round(request["volume"] / 2.0, 2)
+                    if reduced_vol >= spec.min_lot and reduced_vol != request["volume"]:
+                        logger.info(f"Retrying order with reduced volume: {reduced_vol} lots...")
+                        request["volume"] = reduced_vol
+                        result_retry = mt5.order_send(request)
+                        if result_retry and result_retry.retcode == mt5.TRADE_RETCODE_DONE:
+                            logger.info(f"ORDER FILLED (Reduced Volume): Ticket #{result_retry.order} | Volume: {result_retry.volume} | Price: {result_retry.price}")
+                            return True
+                    logger.error(f"Order send failed: Insufficient margin for {signal.symbol}. Balance/Margin too low.")
+                    return False
                 else:
                     logger.error(f"Order send failed: {result}")
                     return False

@@ -136,10 +136,10 @@ SUPPORTED_SYMBOLS: Dict[str, SymbolSpec] = {
         min_lot=0.01,
         max_lot=100.0,
         lot_step=0.01,
-        fixed_lot=0.10,
-        default_sl_pips=10.0,       # 10 pips * 0.10 lot = $10.00 Risk
-        default_tp_pips=30.0,       # 30 pips * 0.10 lot = $30.00 Reward (1:3 RR)
-        default_tp2_pips=50.0       # 50 pips * 0.10 lot = $50.00 Reward (1:5 RR)
+        fixed_lot=0.05,             # 0.05 lots ($5.00 risk on 10p SL, ~$57 margin required)
+        default_sl_pips=10.0,       # 10 pips * 0.05 lot = $5.00 Risk
+        default_tp_pips=30.0,       # 30 pips * 0.05 lot = $15.00 Reward (1:3 RR)
+        default_tp2_pips=50.0       # 50 pips * 0.05 lot = $25.00 Reward (1:5 RR)
     ),
     "GBPUSD": SymbolSpec(
         symbol="GBPUSD",
@@ -150,10 +150,10 @@ SUPPORTED_SYMBOLS: Dict[str, SymbolSpec] = {
         min_lot=0.01,
         max_lot=100.0,
         lot_step=0.01,
-        fixed_lot=0.10,
-        default_sl_pips=10.0,       # 10 pips * 0.10 lot = $10.00 Risk
-        default_tp_pips=30.0,       # 30 pips * 0.10 lot = $30.00 Reward (1:3 RR)
-        default_tp2_pips=50.0       # 50 pips * 0.10 lot = $50.00 Reward (1:5 RR)
+        fixed_lot=0.05,             # 0.05 lots ($5.00 risk on 10p SL, ~$66 margin required)
+        default_sl_pips=10.0,       # 10 pips * 0.05 lot = $5.00 Risk
+        default_tp_pips=30.0,       # 30 pips * 0.05 lot = $15.00 Reward (1:3 RR)
+        default_tp2_pips=50.0       # 50 pips * 0.05 lot = $25.00 Reward (1:5 RR)
     ),
     "XAUUSD": SymbolSpec(
         symbol="XAUUSD",
@@ -164,10 +164,10 @@ SUPPORTED_SYMBOLS: Dict[str, SymbolSpec] = {
         min_lot=0.01,
         max_lot=50.0,
         lot_step=0.01,
-        fixed_lot=0.02,
-        default_sl_pips=50.0,       # 50 pips * 0.02 lot = $10.00 Risk
-        default_tp_pips=150.0,      # 150 pips * 0.02 lot = $30.00 Reward (1:3 RR)
-        default_tp2_pips=250.0      # 250 pips * 0.02 lot = $50.00 Reward (1:5 RR)
+        fixed_lot=0.01,             # 0.01 lots ($5.00 risk on 50p SL, ~$43 margin required)
+        default_sl_pips=50.0,       # 50 pips * 0.01 lot = $5.00 Risk
+        default_tp_pips=150.0,      # 150 pips * 0.01 lot = $15.00 Reward (1:3 RR)
+        default_tp2_pips=250.0      # 250 pips * 0.01 lot = $25.00 Reward (1:5 RR)
     ),
 }
 
