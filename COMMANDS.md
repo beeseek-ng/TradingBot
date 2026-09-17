@@ -76,7 +76,16 @@ python main.py --mode live
 
 ## 📝 3. Real-Time Log Monitoring
 
-To view live bot output and trade alerts streamed in real-time:
+### Option 1: Browser Live Log Stream (Recommended for Heroku & Remote)
+Open directly in your web browser:
+- **Interactive Live Log Terminal**: [`https://tradingbot-forex-app-dd185071faab.herokuapp.com/live-log`](https://tradingbot-forex-app-dd185071faab.herokuapp.com/live-log)
+- **Main Status Dashboard**: [`https://tradingbot-forex-app-dd185071faab.herokuapp.com/`](https://tradingbot-forex-app-dd185071faab.herokuapp.com/)
+- **Health JSON API**: [`https://tradingbot-forex-app-dd185071faab.herokuapp.com/health`](https://tradingbot-forex-app-dd185071faab.herokuapp.com/health)
+- **Raw Logs JSON API**: [`https://tradingbot-forex-app-dd185071faab.herokuapp.com/api/logs`](https://tradingbot-forex-app-dd185071faab.herokuapp.com/api/logs)
+
+*(Includes auto-scroll, live log-level filtering, search, and 1.5-second real-time streaming).*
+
+### Option 2: Local Terminal Log Streaming
 ```bash
 tail -f logs/bot_activity.log
 ```
