@@ -63,6 +63,9 @@ class RiskConfig:
     Risk parameters enforced across live trading and backtesting.
     Adheres strictly to Prop Firm and capital preservation guidelines.
     """
+    # Account initial balance for simulation / fallback mode
+    ACCOUNT_BALANCE: float = float(os.getenv("ACCOUNT_BALANCE") or os.getenv("INITIAL_BALANCE") or "100.0")
+
     # Fractional Risk per trade when dynamic sizing is enabled
     RISK_PER_TRADE: float = 0.01
     

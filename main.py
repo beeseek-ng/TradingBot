@@ -368,7 +368,9 @@ class PaperClient:
     without requiring the Windows MetaTrader5 library.
     """
 
-    def __init__(self, initial_balance: float = 10000.0):
+    def __init__(self, initial_balance: Optional[float] = None):
+        if initial_balance is None:
+            initial_balance = float(os.getenv("ACCOUNT_BALANCE") or os.getenv("INITIAL_BALANCE") or "100.0")
         self.balance = initial_balance
         self.equity = initial_balance
         self.is_connected = True
@@ -734,10 +736,10 @@ class ForexBot:
             logger.warning("[ForexBot] LIVE MT5 mode was requested, but native MetaTrader5 package is not available in this Python interpreter.")
             logger.warning("[ForexBot] (Note: MT5 on Linux/Heroku requires Wine Python: wine /opt/wine-mt5/drive_c/Python39/python.exe main.py).")
             logger.warning("[ForexBot] Running in PAPER simulation fallback mode until Wine MT5 dyno is active.")
-            self.client = PaperClient(initial_balance=10000.0)
+            self.client = PaperClient(initial_balance=self.risk_config.ACCOUNT_BALANCE)
             self.is_paper = True
         else:
-            self.client = PaperClient(initial_balance=10000.0)
+            self.client = PaperClient(initial_balance=self.risk_config.ACCOUNT_BALANCE)
             self.is_paper = True
 
         self.risk_manager = RiskManager(self.risk_config)

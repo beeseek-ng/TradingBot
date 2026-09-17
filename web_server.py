@@ -23,6 +23,9 @@ logger = logging.getLogger("ForexBot.Web")
 BASE_DIR = Path(__file__).resolve().parent
 LOG_FILE_PATH = BASE_DIR / "logs" / "bot_activity.log"
 
+# Dynamic Initial Balance
+DEFAULT_ACCOUNT_BALANCE = float(os.getenv("ACCOUNT_BALANCE") or os.getenv("INITIAL_BALANCE") or "100.0")
+
 # Global state shared across the bot and web monitor
 BOT_STATUS: Dict[str, Any] = {
     "status": "INITIALIZING",
@@ -31,8 +34,8 @@ BOT_STATUS: Dict[str, Any] = {
     "account": {
         "login": os.getenv("MT5_ACCOUNT") or os.getenv("MT5_LOGIN", "5055872290"),
         "server": os.getenv("MT5_SERVER", "MetaQuotes-Demo"),
-        "balance": 10000.0,
-        "equity": 10000.0,
+        "balance": DEFAULT_ACCOUNT_BALANCE,
+        "equity": DEFAULT_ACCOUNT_BALANCE,
         "daily_drawdown_pct": 0.0,
     },
     "active_symbols": ["EURUSD", "GBPUSD", "XAUUSD"],
