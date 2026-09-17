@@ -48,7 +48,7 @@ class WebConfig:
     PORT: int = int(os.getenv("PORT", "8080"))
     HOST: str = os.getenv("HOST", "0.0.0.0")
     ENABLE_DASHBOARD: bool = os.getenv("ENABLE_WEB_DASHBOARD", "true").lower() in ("1", "true", "yes")
-    BOT_MODE: str = os.getenv("BOT_MODE", "auto")
+    BOT_MODE: str = os.getenv("BOT_MODE", "live")
 
 
 

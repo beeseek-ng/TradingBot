@@ -19,7 +19,7 @@ logger = logging.getLogger("ForexBot.Web")
 # Global state shared across the bot and web monitor
 BOT_STATUS: Dict[str, Any] = {
     "status": "INITIALIZING",
-    "mode": os.getenv("BOT_MODE", "paper").upper(),
+    "mode": os.getenv("BOT_MODE", "live").upper(),
     "start_time": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
     "account": {
         "login": os.getenv("MT5_LOGIN", "5055872290"),

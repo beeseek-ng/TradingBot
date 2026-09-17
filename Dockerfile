@@ -11,7 +11,8 @@ ENV DEBIAN_FRONTEND=noninteractive \
     WINEPREFIX=/opt/wine-mt5 \
     WINEDEBUG=-all \
     DISPLAY=:99 \
-    PORT=8080
+    PORT=8080 \
+    BOT_MODE=live
 
 # 1. Install system utilities, Xvfb (Virtual Framebuffer), Wine, and Linux Python
 RUN dpkg --add-architecture i386 && \
@@ -34,7 +35,7 @@ RUN dpkg --add-architecture i386 && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# 2. Setup Windows Python 3.9 and MetaTrader5 package inside Wine for Headless Live MT5
+# 2. Setup Windows Python 3.9, MetaTrader5 package, and MT5 terminal inside Wine for Headless Live MT5
 RUN mkdir -p /opt/wine-mt5/drive_c/Python39 && \
     curl -sSL -o /tmp/python-39.zip https://www.python.org/ftp/python/3.9.13/python-3.9.13-embed-amd64.zip && \
     unzip -q -o /tmp/python-39.zip -d /opt/wine-mt5/drive_c/Python39 && \
@@ -44,8 +45,11 @@ RUN mkdir -p /opt/wine-mt5/drive_c/Python39 && \
     curl -sSL -o /opt/wine-mt5/drive_c/Python39/get-pip.py https://bootstrap.pypa.io/pip/3.9/get-pip.py && \
     Xvfb :99 -screen 0 1024x768x16 & \
     sleep 2 && \
-    wine /opt/wine-mt5/drive_c/Python39/python.exe /opt/wine-mt5/drive_c/Python39/get-pip.py --no-warn-script-location && \
-    wine /opt/wine-mt5/drive_c/Python39/Scripts/pip.exe install --no-cache-dir MetaTrader5 "numpy<2" pandas tabulate && \
+    DISPLAY=:99 wine /opt/wine-mt5/drive_c/Python39/python.exe /opt/wine-mt5/drive_c/Python39/get-pip.py --no-warn-script-location && \
+    DISPLAY=:99 wine /opt/wine-mt5/drive_c/Python39/Scripts/pip.exe install --no-cache-dir MetaTrader5 "numpy<2" pandas tabulate && \
+    curl -sSL -o /tmp/mt5setup.exe https://download.mql5.com/cdn/web/metaquotes.software.corp/mt5/mt5setup.exe && \
+    DISPLAY=:99 wine /tmp/mt5setup.exe /auto || true && \
+    rm -f /tmp/mt5setup.exe && \
     pkill Xvfb || true
 
 # 3. Create app workspace

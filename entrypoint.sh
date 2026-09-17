@@ -5,7 +5,7 @@
 
 set -e
 
-BOT_MODE="${BOT_MODE:-auto}"
+BOT_MODE="${BOT_MODE:-live}"
 WINE_PREFIX_DIR="${WINEPREFIX:-/opt/wine-mt5}"
 PYTHON_WINE_EXE="$WINE_PREFIX_DIR/drive_c/Python39/python.exe"
 
@@ -34,12 +34,26 @@ start_xvfb() {
     fi
 }
 
-# 1. Live Mode with MT5 on Wine
+# Ensure MT5 Terminal exists inside Wine prefix
+ensure_mt5_terminal() {
+    local mt5_dir="$WINE_PREFIX_DIR/drive_c/Program Files/MetaTrader 5"
+    if [ ! -f "$mt5_dir/terminal64.exe" ]; then
+        echo "[INFO] MetaTrader 5 terminal not found. Initializing setup via silent installer..."
+        start_xvfb
+        mkdir -p "$mt5_dir"
+        curl -sSL -o /tmp/mt5setup.exe https://download.mql5.com/cdn/web/metaquotes.software.corp/mt5/mt5setup.exe
+        WINEDEBUG=-all WINEPREFIX="$WINE_PREFIX_DIR" DISPLAY=:99 wine /tmp/mt5setup.exe /auto || true
+        rm -f /tmp/mt5setup.exe
+    fi
+}
+
+# 1. Live Mode with MT5 on Wine (Default)
 if [ "$BOT_MODE" = "live" ]; then
     echo "[INFO] Starting ForexBot in LIVE MetaTrader 5 mode under Wine..."
     start_xvfb
     export WINEDEBUG=-all
     export WINEPREFIX="$WINE_PREFIX_DIR"
+    ensure_mt5_terminal
     
     if [ -f "$PYTHON_WINE_EXE" ]; then
         exec wine "$PYTHON_WINE_EXE" main.py --mode live
@@ -60,6 +74,7 @@ else
         start_xvfb
         export WINEDEBUG=-all
         export WINEPREFIX="$WINE_PREFIX_DIR"
+        ensure_mt5_terminal
         exec wine "$PYTHON_WINE_EXE" main.py --mode live
     else
         exec python3 main.py --mode paper
