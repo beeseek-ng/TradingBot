@@ -5,8 +5,23 @@
 
 set -e
 
-BOT_MODE="${BOT_MODE:-live}"
+# Support both BOT_MODE and EXECUTION_MODE env vars
+BOT_MODE="${BOT_MODE:-${EXECUTION_MODE:-live}}"
+BOT_MODE="$(echo "$BOT_MODE" | tr '[:upper:]' '[:lower:]')"
+
+# Discover Wine Prefix and Python executable
 WINE_PREFIX_DIR="${WINEPREFIX:-/opt/wine-mt5}"
+
+# Check known candidate locations for Wine Python
+if [ ! -f "$WINE_PREFIX_DIR/drive_c/Python39/python.exe" ]; then
+    for candidate_dir in "/opt/wine-mt5" "$HOME/.mt5" "$HOME/.wine"; do
+        if [ -f "$candidate_dir/drive_c/Python39/python.exe" ]; then
+            WINE_PREFIX_DIR="$candidate_dir"
+            break
+        fi
+    done
+fi
+
 PYTHON_WINE_EXE="$WINE_PREFIX_DIR/drive_c/Python39/python.exe"
 
 echo "=================================================="
@@ -16,6 +31,7 @@ echo "Container Mode:      $BOT_MODE"
 echo "Web Port (\$PORT):    ${PORT:-8080}"
 echo "Display Server:      :99 (Headless Xvfb)"
 echo "Wine Prefix:         $WINE_PREFIX_DIR"
+echo "Wine Python:         $PYTHON_WINE_EXE"
 echo "=================================================="
 
 # If custom command passed directly (e.g. bash, pytest, backtester.py), execute it
@@ -53,16 +69,17 @@ if [ "$BOT_MODE" = "live" ]; then
     start_xvfb || true
     export WINEDEBUG=-all
     export WINEPREFIX="$WINE_PREFIX_DIR"
+    export PYTHONPATH="."
     ensure_mt5_terminal || true
     
     if [ -f "$PYTHON_WINE_EXE" ]; then
-        echo "[INFO] Launching Wine Python MT5 Bridge..."
+        echo "[INFO] Launching Wine Python MT5 Bridge ($PYTHON_WINE_EXE)..."
         wine "$PYTHON_WINE_EXE" main.py --mode live || {
-            echo "[WARN] Wine MT5 process failed (e.g. unprivileged cloud container). Falling back to Native Linux Python (Paper Mode)..."
+            echo "[WARN] Wine MT5 process failed. Falling back to Native Linux Python (Paper Mode)..."
             exec python3 main.py --mode paper
         }
     else
-        echo "[WARN] Wine Python not found at $PYTHON_WINE_EXE, running with Linux Python..."
+        echo "[WARN] Wine Python not found at $PYTHON_WINE_EXE. Running with Native Linux Python..."
         exec python3 main.py --mode live || exec python3 main.py --mode paper
     fi
 
@@ -74,16 +91,17 @@ elif [ "$BOT_MODE" = "paper" ]; then
 # 3. Auto Mode (Detects environment)
 else
     echo "[INFO] Starting ForexBot in AUTO mode..."
-    if [ -f "$PYTHON_WINE_EXE" ] && [ -n "$MT5_LOGIN" ]; then
+    if [ -f "$PYTHON_WINE_EXE" ]; then
         start_xvfb || true
         export WINEDEBUG=-all
         export WINEPREFIX="$WINE_PREFIX_DIR"
+        export PYTHONPATH="."
         ensure_mt5_terminal || true
         wine "$PYTHON_WINE_EXE" main.py --mode live || {
             echo "[WARN] Wine MT5 failed, falling back to Paper Mode..."
             exec python3 main.py --mode paper
         }
     else
-        exec python3 main.py --mode paper
+        exec python3 main.py --mode auto
     fi
 fi

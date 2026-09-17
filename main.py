@@ -727,9 +727,15 @@ class ForexBot:
         self.risk_config = RiskConfig()
         self.strategy_config = StrategyConfig()
 
-        if self.mode == "LIVE":
+        if self.mode == "LIVE" and MT5_AVAILABLE:
             self.client = MT5Client(self.mt5_config)
             self.is_paper = False
+        elif self.mode == "LIVE" and not MT5_AVAILABLE:
+            logger.warning("[ForexBot] LIVE MT5 mode was requested, but native MetaTrader5 package is not available in this Python interpreter.")
+            logger.warning("[ForexBot] (Note: MT5 on Linux/Heroku requires Wine Python: wine /opt/wine-mt5/drive_c/Python39/python.exe main.py).")
+            logger.warning("[ForexBot] Running in PAPER simulation fallback mode until Wine MT5 dyno is active.")
+            self.client = PaperClient(initial_balance=10000.0)
+            self.is_paper = True
         else:
             self.client = PaperClient(initial_balance=10000.0)
             self.is_paper = True
