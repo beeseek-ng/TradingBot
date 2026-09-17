@@ -47,19 +47,23 @@ ensure_mt5_terminal() {
     fi
 }
 
-# 1. Live Mode with MT5 on Wine (Default)
+# 1. Live Mode with MT5 on Wine
 if [ "$BOT_MODE" = "live" ]; then
-    echo "[INFO] Starting ForexBot in LIVE MetaTrader 5 mode under Wine..."
-    start_xvfb
+    echo "[INFO] Attempting to start ForexBot in LIVE MetaTrader 5 mode under Wine..."
+    start_xvfb || true
     export WINEDEBUG=-all
     export WINEPREFIX="$WINE_PREFIX_DIR"
-    ensure_mt5_terminal
+    ensure_mt5_terminal || true
     
     if [ -f "$PYTHON_WINE_EXE" ]; then
-        exec wine "$PYTHON_WINE_EXE" main.py --mode live
+        echo "[INFO] Launching Wine Python MT5 Bridge..."
+        wine "$PYTHON_WINE_EXE" main.py --mode live || {
+            echo "[WARN] Wine MT5 process failed (e.g. unprivileged cloud container). Falling back to Native Linux Python (Paper Mode)..."
+            exec python3 main.py --mode paper
+        }
     else
-        echo "[WARN] Wine Python not found at $PYTHON_WINE_EXE, falling back to Linux Python..."
-        exec python3 main.py --mode live
+        echo "[WARN] Wine Python not found at $PYTHON_WINE_EXE, running with Linux Python..."
+        exec python3 main.py --mode live || exec python3 main.py --mode paper
     fi
 
 # 2. Paper Trading Simulation Mode (Native Linux Python)
@@ -71,11 +75,14 @@ elif [ "$BOT_MODE" = "paper" ]; then
 else
     echo "[INFO] Starting ForexBot in AUTO mode..."
     if [ -f "$PYTHON_WINE_EXE" ] && [ -n "$MT5_LOGIN" ]; then
-        start_xvfb
+        start_xvfb || true
         export WINEDEBUG=-all
         export WINEPREFIX="$WINE_PREFIX_DIR"
-        ensure_mt5_terminal
-        exec wine "$PYTHON_WINE_EXE" main.py --mode live
+        ensure_mt5_terminal || true
+        wine "$PYTHON_WINE_EXE" main.py --mode live || {
+            echo "[WARN] Wine MT5 failed, falling back to Paper Mode..."
+            exec python3 main.py --mode paper
+        }
     else
         exec python3 main.py --mode paper
     fi
