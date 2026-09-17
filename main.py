@@ -764,11 +764,14 @@ class ForexBot:
         logger.info("==================================================")
 
         # Launch Web Dashboard for Heroku and Cloud monitoring if enabled or PORT is set
-        if self.web_config.ENABLE_DASHBOARD or os.getenv("PORT"):
+        enable_dash = getattr(self.web_config, "ENABLE_DASHBOARD", True) or getattr(self.web_config, "ENABLE_WEB_DASHBOARD", True) or bool(os.getenv("PORT"))
+        if enable_dash:
+            port = int(os.getenv("PORT", getattr(self.web_config, "PORT", 8080)))
+            host = getattr(self.web_config, "HOST", "0.0.0.0")
             try:
-                web_server.start_web_server(port=self.web_config.PORT, host=self.web_config.HOST)
+                web_server.start_web_server(port=port, host=host)
             except Exception as ex:
-                logger.warning(f"Could not start web dashboard on port {self.web_config.PORT}: {ex}")
+                logger.warning(f"Could not start web dashboard on port {port}: {ex}")
 
         if not self.client.connect():
             logger.error("Initial connection failed. Exiting.")

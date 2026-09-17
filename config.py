@@ -47,6 +47,8 @@ class WebConfig:
     """Settings for Cloud/Heroku web dashboard and health monitoring."""
     PORT: int = int(os.getenv("PORT", "8080"))
     HOST: str = os.getenv("HOST", "0.0.0.0")
+    ENABLE_DASHBOARD: bool = os.getenv("ENABLE_WEB_DASHBOARD", "true").lower() in ("1", "true", "yes")
+    ENABLE_WEB_DASHBOARD: bool = os.getenv("ENABLE_WEB_DASHBOARD", "true").lower() in ("1", "true", "yes")
     EXECUTION_MODE: str = "PAPER" if (os.getenv("EXECUTION_MODE", "").upper() == "PAPER" or os.getenv("BOT_MODE", "").upper() == "PAPER") else "LIVE"
     BOT_MODE: str = EXECUTION_MODE
 
