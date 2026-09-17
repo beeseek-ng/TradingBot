@@ -28,7 +28,7 @@ LOGS_DIR.mkdir(parents=True, exist_ok=True)
 @dataclass(frozen=True)
 class MT5Config:
     """Account credentials and MT5 terminal settings."""
-    LOGIN: int = int(os.getenv("MT5_LOGIN", "5055872290"))
+    LOGIN: int = int(os.getenv("MT5_ACCOUNT") or os.getenv("MT5_LOGIN", "5055872290"))
     PASSWORD: str = os.getenv("MT5_PASSWORD", "RhPwCr*0")
     SERVER: str = os.getenv("MT5_SERVER", "MetaQuotes-Demo")
     
@@ -48,7 +48,8 @@ class WebConfig:
     PORT: int = int(os.getenv("PORT", "8080"))
     HOST: str = os.getenv("HOST", "0.0.0.0")
     ENABLE_DASHBOARD: bool = os.getenv("ENABLE_WEB_DASHBOARD", "true").lower() in ("1", "true", "yes")
-    BOT_MODE: str = os.getenv("BOT_MODE", "live")
+    EXECUTION_MODE: str = "LIVE" if (os.getenv("EXECUTION_MODE", "").upper() == "LIVE" or os.getenv("BOT_MODE", "").upper() == "LIVE") else "PAPER"
+    BOT_MODE: str = EXECUTION_MODE
 
 
 

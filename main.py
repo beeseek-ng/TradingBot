@@ -483,23 +483,29 @@ class OrderExecutor:
             return []
 
     def _determine_filling_mode(self, symbol: str) -> int:
-        """Dynamically detects supported MT5 execution filling mode for the symbol."""
+        """
+        Dynamically detects supported MT5 execution filling mode for the symbol using bitmask checks.
+        Prevents MT5 10030 (Unsupported filling mode) error.
+        """
         if not MT5_AVAILABLE:
             return 0
         try:
-            sym_info = self.client.get_symbol_info(symbol)
+            sym_info = self.client.get_symbol_info(symbol) if hasattr(self.client, "get_symbol_info") else mt5.symbol_info(symbol)
+            if sym_info is None:
+                sym_info = mt5.symbol_info(symbol)
             if sym_info is not None:
-                filling_flags = getattr(sym_info, "filling_mode", 0)
-                # Bit 1 = FOK (1), Bit 2 = IOC (2), Bit 4 = BOC (4)
-                if filling_flags & 1:
+                filling_mode = getattr(sym_info, "filling_mode", 0)
+                # Bit 0 (1): SYMBOL_FILLING_FOK -> ORDER_FILLING_FOK
+                if filling_mode & 1:
                     return mt5.ORDER_FILLING_FOK
-                elif filling_flags & 2:
+                # Bit 1 (2): SYMBOL_FILLING_IOC -> ORDER_FILLING_IOC
+                elif filling_mode & 2:
                     return mt5.ORDER_FILLING_IOC
-                elif filling_flags & 4:
-                    return mt5.ORDER_FILLING_BOC
-        except Exception:
-            pass
-        return mt5.ORDER_FILLING_FOK
+        except Exception as ex:
+            logger.warning(f"Error checking symbol filling mode for {symbol}: {ex}")
+        
+        # Default fallback to ORDER_FILLING_RETURN
+        return getattr(mt5, "ORDER_FILLING_RETURN", 2)
 
     def open_trade(self, signal: TradeSignal, lot_size: float, spec: SymbolSpec) -> bool:
         """Dispatches market BUY or SELL order with exact SL/TP and auto-adaptive filling mode."""
@@ -663,17 +669,25 @@ class ForexBot:
 
     def __init__(self, mode: str = "auto"):
         self.web_config = WebConfig()
-        # Prefer explicit mode arg, otherwise fallback to BOT_MODE environment variable
-        if mode == "auto" and self.web_config.BOT_MODE != "auto":
-            self.mode = self.web_config.BOT_MODE
+        
+        # Dynamically read EXECUTION_MODE or BOT_MODE from env/config
+        env_mode = os.getenv("EXECUTION_MODE", os.getenv("BOT_MODE", self.web_config.EXECUTION_MODE)).upper()
+        if mode in ("live", "LIVE"):
+            self.mode = "LIVE"
+        elif mode in ("paper", "PAPER"):
+            self.mode = "PAPER"
+        elif env_mode == "LIVE":
+            self.mode = "LIVE"
+        elif env_mode == "PAPER":
+            self.mode = "PAPER"
         else:
-            self.mode = mode
+            self.mode = "LIVE" if MT5_AVAILABLE else "PAPER"
 
         self.mt5_config = MT5Config()
         self.risk_config = RiskConfig()
         self.strategy_config = StrategyConfig()
 
-        if self.mode == "live" or (self.mode == "auto" and MT5_AVAILABLE):
+        if self.mode == "LIVE":
             self.client = MT5Client(self.mt5_config)
             self.is_paper = False
         else:
