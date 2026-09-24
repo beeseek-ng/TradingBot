@@ -28,5 +28,7 @@ Thumbs.db
 *.swp
 *.swo
 
-# Temporary files
+# Temporary & Export files
 /tmp/
+*.xlsx
+*.csv
