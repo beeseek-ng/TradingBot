@@ -14,27 +14,24 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PORT=8080 \
     BOT_MODE=live
 
-# 1. Install system utilities, Xvfb (Virtual Framebuffer), WineHQ Wine 9+, and Linux Python
+# 1. Install system utilities, Xvfb (Virtual Framebuffer), Wine, and Linux Python
 RUN dpkg --add-architecture i386 && \
     apt-get update && \
     apt-get install -y --no-install-recommends \
         ca-certificates \
         curl \
         wget \
-        gnupg \
         unzip \
         xvfb \
         procps \
         git \
+        wine64 \
+        wine32 \
+        wine \
         python3 \
         python3-pip \
         python3-setuptools \
         python3-wheel && \
-    mkdir -pm755 /etc/apt/keyrings && \
-    wget -O /etc/apt/keyrings/winehq-archive.key https://dl.winehq.org/wine-builds/winehq.key && \
-    wget -NP /etc/apt/sources.list.d/ https://dl.winehq.org/wine-builds/ubuntu/dists/jammy/winehq-jammy.sources && \
-    apt-get update && \
-    apt-get install -y --install-recommends winehq-stable && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
@@ -45,16 +42,17 @@ RUN mkdir -p /opt/wine-mt5/drive_c/Python39 && \
     rm /tmp/python-39.zip && \
     sed -i 's/#import site/import site/' /opt/wine-mt5/drive_c/Python39/python39._pth && \
     echo "Lib/site-packages" >> /opt/wine-mt5/drive_c/Python39/python39._pth && \
+    echo "Z:\\app" >> /opt/wine-mt5/drive_c/Python39/python39._pth && \
     curl -sSL -o /opt/wine-mt5/drive_c/Python39/get-pip.py https://bootstrap.pypa.io/pip/3.9/get-pip.py && \
     Xvfb :99 -screen 0 1024x768x16 & \
     sleep 2 && \
-    DISPLAY=:99 wine /opt/wine-mt5/drive_c/Python39/python.exe /opt/wine-mt5/drive_c/Python39/get-pip.py --no-warn-script-location && \
+    DISPLAY=:99 WINEDEBUG=-all wine /opt/wine-mt5/drive_c/Python39/python.exe /opt/wine-mt5/drive_c/Python39/get-pip.py --no-warn-script-location && \
     curl -sSL -o /tmp/vc_redist.x64.exe https://aka.ms/vs/17/release/vc_redist.x64.exe && \
-    DISPLAY=:99 wine /tmp/vc_redist.x64.exe /install /quiet /norestart || true && \
+    DISPLAY=:99 WINEDEBUG=-all wine /tmp/vc_redist.x64.exe /install /quiet /norestart || true && \
     rm -f /tmp/vc_redist.x64.exe && \
-    DISPLAY=:99 wine /opt/wine-mt5/drive_c/Python39/Scripts/pip.exe install --no-cache-dir MetaTrader5 "numpy<2" pandas tabulate && \
+    DISPLAY=:99 WINEDEBUG=-all wine /opt/wine-mt5/drive_c/Python39/Scripts/pip.exe install --no-cache-dir MetaTrader5 "numpy==1.23.5" "pandas==1.5.3" tabulate && \
     curl -sSL -o /tmp/mt5setup.exe https://download.mql5.com/cdn/web/metaquotes.software.corp/mt5/mt5setup.exe && \
-    DISPLAY=:99 wine /tmp/mt5setup.exe /auto || true && \
+    DISPLAY=:99 WINEDEBUG=-all wine /tmp/mt5setup.exe /auto || true && \
     rm -f /tmp/mt5setup.exe && \
     pkill Xvfb || true
 

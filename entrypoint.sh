@@ -70,7 +70,8 @@ if [ "$BOT_MODE" = "live" ]; then
     export WINEDEBUG=-all
     export WINEDLLOVERRIDES="winedbg.exe=d"
     export WINEPREFIX="$WINE_PREFIX_DIR"
-    export PYTHONPATH="."
+    export PYTHONPATH="Z:\\app:."
+    export PYTHONIOENCODING="utf-8"
     ensure_mt5_terminal || true
     
     if [ -f "$PYTHON_WINE_EXE" ]; then
