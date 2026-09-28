@@ -68,6 +68,7 @@ if [ "$BOT_MODE" = "live" ]; then
     echo "[INFO] Attempting to start ForexBot in LIVE MetaTrader 5 mode under Wine..."
     start_xvfb || true
     export WINEDEBUG=-all
+    export WINEDLLOVERRIDES="winedbg.exe=d"
     export WINEPREFIX="$WINE_PREFIX_DIR"
     export PYTHONPATH="."
     ensure_mt5_terminal || true
