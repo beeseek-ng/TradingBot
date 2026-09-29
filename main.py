@@ -117,9 +117,18 @@ class MT5Client:
             if self.config.PATH:
                 init_kwargs["path"] = self.config.PATH
 
-            if not mt5.initialize(**init_kwargs):
+            initialized = False
+            for attempt in range(1, 4):
+                if mt5.initialize(**init_kwargs):
+                    initialized = True
+                    break
                 err = mt5.last_error()
-                logger.error(f"MT5 initialize() failed: {err}")
+                logger.warning(f"MT5 initialize() attempt {attempt}/3 failed: {err}")
+                time.sleep(2.0)
+
+            if not initialized:
+                err = mt5.last_error()
+                logger.error(f"MT5 initialize() failed after 3 attempts: {err}")
                 return False
 
             # Login if credentials provided
@@ -783,9 +792,15 @@ class ForexBot:
                 logger.warning(f"Could not start web dashboard on port {port}: {ex}")
 
         if not self.client.connect():
-            logger.error("Initial connection failed. Exiting.")
-            web_server.update_web_status(status="CONNECTION_FAILED", mode="PAPER" if self.is_paper else "LIVE")
-            return False
+            if self.mode == "LIVE":
+                logger.warning("[ForexBot] LIVE MT5 connection failed. Switching to Paper Simulation fallback to keep dashboard and trading engine active.")
+                self.client = PaperClient(initial_balance=self.risk_config.ACCOUNT_BALANCE)
+                self.is_paper = True
+                self.client.connect()
+            else:
+                logger.error("Initial connection failed. Exiting.")
+                web_server.update_web_status(status="CONNECTION_FAILED", mode="PAPER" if self.is_paper else "LIVE")
+                return False
 
         equity, balance = self.client.get_account_equity_and_balance()
         self.prop_guard.update_daily_baseline(balance)

@@ -32,11 +32,11 @@ class MT5Config:
     PASSWORD: str = os.getenv("MT5_PASSWORD", "RhPwCr*0")
     SERVER: str = os.getenv("MT5_SERVER", "MetaQuotes-Demo")
     
-    PATH: str = os.getenv("MT5_PATH", "")
+    PATH: str = os.getenv("MT5_PATH", "C:\\Program Files\\MetaTrader 5\\terminal64.exe")
     MAGIC_NUMBER: int = 101202           # Unique ID to identify bot trades
     SLIPPAGE_POINTS: int = 20            # Allowed slippage in points (2 pips on FX)
     TIMEOUT_MS: int = 60000              # MT5 API timeout in ms
-    PORTABLE: bool = False
+    PORTABLE: bool = os.getenv("MT5_PORTABLE", "true").lower() in ("1", "true", "yes")
 
 
 # ---------------------------------------------------------------------------
