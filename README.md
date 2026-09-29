@@ -1,23 +1,23 @@
-# ForexBot ⚡ Institutional Multi-Timeframe Algorithmic Trading System
+# ForexBot: Institutional Multi-Timeframe Algorithmic Trading System
 
 [![Status: Production](https://img.shields.io/badge/Status-Production%20Ready-emerald?style=for-the-badge&logo=probot)](https://github.com/beeseek-ng/TradingBot)
 [![Platform: MetaTrader 5](https://img.shields.io/badge/Platform-MetaTrader%205-blue?style=for-the-badge&logo=windows)](https://www.metatrader5.com/)
 [![Strategy: SLK & CRT](https://img.shields.io/badge/Strategy-SLK%20%26%20CRT%20Engine-purple?style=for-the-badge)](https://github.com/beeseek-ng/TradingBot)
 [![License: MIT](https://img.shields.io/badge/License-MIT-amber?style=for-the-badge)](LICENSE)
 
-ForexBot is an institutional-grade, fully automated algorithmic trading system engineered for **Foreign Exchange (FX)** and **Precious Metals (Gold)**. It transforms advanced discretionary price action theories—specifically **Structure, Liquidity, Key Levels (SLK)** and **Candle Range Theory (CRT)**—into a strictly quantified, emotionless, high-precision execution model.
+ForexBot is an institutional-grade, fully automated algorithmic trading system engineered for Foreign Exchange (FX) and Precious Metals (Gold). It transforms advanced discretionary price action theories, specifically Structure, Liquidity, Key Levels (SLK) and Candle Range Theory (CRT), into a strictly quantified, emotionless, high-precision execution model.
 
-Built with a capital-preservation-first philosophy, ForexBot is tailored specifically for modern **prop firm compliance** (FTMO, FundedNext, Topstep, etc.) and professional portfolio management, combining multi-timeframe market analysis with institutional risk guardrails and 24/7 cloud telemetry.
+Built with a capital-preservation-first philosophy, ForexBot is tailored specifically for modern prop firm compliance (FTMO, FundedNext, Topstep, etc.) and professional portfolio management, combining multi-timeframe market analysis with institutional risk guardrails and 24/7 cloud telemetry.
 
 ---
 
-## 🧭 Why ForexBot?
+## Why ForexBot?
 
 ### The Problem with Conventional Trading Bots
-Traditional retail automated trading systems rely heavily on lagging mathematical indicators (RSI, MACD, Moving Average crossovers) or dangerous risk mechanics like Martingale and high-density grid trading. These approaches consistently fail in volatile, regime-shifting markets because they ignore the true underlying drivers of price discovery: **order book liquidity**, **interbank market structure**, and **institutional session timing**.
+Traditional retail automated trading systems rely heavily on lagging mathematical indicators (RSI, MACD, Moving Average crossovers) or dangerous risk mechanics like Martingale and high-density grid trading. These approaches consistently fail in volatile, regime-shifting markets because they ignore the true underlying drivers of price discovery: order book liquidity, interbank market structure, and institutional session timing.
 
 ### The ForexBot Paradigm
-ForexBot approaches financial markets through the lens of **institutional order flow**:
+ForexBot approaches financial markets through the lens of institutional order flow:
 - **Price Moves Toward Liquidity**: Price is constantly drawn toward pools of resting buy-side or sell-side liquidity (stop orders and breakout orders).
 - **Session-Driven Volatility**: The highest-probability expansions occur during peak market overlap killzones (London and New York sessions).
 - **Timeframe Alignment**: Lower-timeframe execution is only valid when confirmed by higher-timeframe market storylines.
@@ -25,7 +25,7 @@ ForexBot approaches financial markets through the lens of **institutional order 
 
 ---
 
-## 🏛️ Strategic Architecture & Trading Engine
+## Strategic Architecture and Trading Engine
 
 ForexBot unifies two complementary trading engines into a seamless decision-making pipeline:
 
@@ -55,7 +55,7 @@ The CRT Engine provides surgical precision for trade timing:
 
 ---
 
-## 🛡️ Prop Firm Guardrails & Capital Preservation
+## Prop Firm Guardrails and Capital Preservation
 
 ForexBot was designed from day one to conquer institutional evaluation challenges and retain funded capital. It enforces strict mathematical safeguards that run continuously at the execution layer:
 
@@ -69,17 +69,17 @@ ForexBot was designed from day one to conquer institutional evaluation challenge
 
 ---
 
-## 📊 Monitored Asset Classes
+## Monitored Asset Classes
 
 ForexBot monitors three core assets selected for deep institutional liquidity, predictable session behavior, and tight spreads:
 
-* **EUR/USD (Euro / US Dollar)**: The world’s primary FX pair. Serves as the bedrock liquidity anchor, displaying clean institutional range sweeps during European morning hours.
+* **EUR/USD (Euro / US Dollar)**: The world's primary FX pair. Serves as the bedrock liquidity anchor, displaying clean institutional range sweeps during European morning hours.
 * **GBP/USD (British Pound / US Dollar)**: Renowned for explosive session displacement and decisive liquidity runs during London and US overlap.
 * **XAU/USD (Gold / US Dollar)**: High-beta commodity asset offering extended asymmetric expansions and macro liquidity sweeps across New York trading hours.
 
 ---
 
-## ⚙️ Operational Modes
+## Operational Modes
 
 ForexBot is engineered to transition effortlessly across the entire quantitative development lifecycle:
 
@@ -95,33 +95,33 @@ ForexBot is engineered to transition effortlessly across the entire quantitative
 
 ---
 
-## 📡 Live Telemetry & Observability
+## Live Telemetry and Observability
 
 ForexBot features a built-in, lightweight web monitoring system requiring zero external databases or third-party monitoring subscriptions:
 
-* **Responsive Status Dashboard**: Instant visual overview of current operational state (`● RUNNING (LIVE)` / `● RUNNING (PAPER)`), account balance, equity, daily drawdown percentage, and active market exposures.
+* **Responsive Status Dashboard**: Instant visual overview of current operational state (`RUNNING (LIVE)` / `RUNNING (PAPER)`), account balance, equity, daily drawdown percentage, and active market exposures.
 * **Live Activity Log Stream (`/live-log`)**: Browser-accessible streaming terminal log providing minute-by-minute visibility into candle evaluations, session sweeps, and signal triggers.
 * **JSON Health API (`/health`)**: Production-ready health check endpoint compatible with uptime monitors, Coolify, Heroku, and alerting services.
 
 ---
 
-## ☁️ Cloud & Infrastructure Readiness
+## Cloud and Infrastructure Readiness
 
 ForexBot is fully containerized and cloud-native:
-* **Docker & Linux Compatibility**: Runs headlessly in Docker on any Linux VPS (Ubuntu, Debian, Contabo, DigitalOcean, AWS, etc.) using Wine-bridged MetaTrader 5 execution.
+* **Docker and Linux Compatibility**: Runs headlessly in Docker on any Linux VPS (Ubuntu, Debian, Contabo, DigitalOcean, AWS, etc.) using Wine-bridged MetaTrader 5 execution.
 * **Container Orchestration**: Pre-configured support for Docker Compose, Coolify, and Heroku.
 * **Resilient Auto-Reconnection**: Automatic reconnect handlers safeguard against broker disconnects, network hiccups, and VPS restarts without human intervention.
 
 ---
 
-## 📜 Disclaimer & Risk Notice
+## Disclaimer and Risk Notice
 
-*Financial trading involves substantial risk of loss and is not suitable for every investor. ForexBot is an algorithmic software tool designed for quantitative research, backtesting, and systematic execution. Past performance in backtesting or simulated environments does not guarantee future results. Users are strongly advised to thoroughly test all configurations on demo accounts before deploying real capital.*
+Financial trading involves substantial risk of loss and is not suitable for every investor. ForexBot is an algorithmic software tool designed for quantitative research, backtesting, and systematic execution. Past performance in backtesting or simulated environments does not guarantee future results. Users are strongly advised to thoroughly test all configurations on demo accounts before deploying real capital.
 
 ---
 
-## 🤝 Project Credits & Collaboration
+## Project Credits and Collaboration
 
 * Developed and maintained by the **[BeeSeek Quantitative Engineering Team](https://github.com/beeseek-ng)**.
-* **Core Contributors**: Emmanuel Gyimah ([@emdevelopa](https://github.com/emdevelopa)) & Wisdom Divine ([@wisdomnova](https://github.com/wisdomnova)).
+* **Core Contributors**: Emmanuel Gyimah ([@emdevelopa](https://github.com/emdevelopa)) and Wisdom Divine ([@wisdomnova](https://github.com/wisdomnova)).
 * Licensed under the [MIT License](LICENSE).
