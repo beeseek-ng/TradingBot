@@ -1,0 +1,273 @@
+================================================================================
+ FOREXBOT - 24/7 VPS & COOLIFY DEPLOYMENT GUIDE
+================================================================================
+Target: Continuous 24/7 Live/Demo MT5 Algorithmic Trading with Zero Downtime
+Supported Environments: Coolify PaaS, Docker Compose on Ubuntu VPS, or Systemd
+================================================================================
+
+TABLE OF CONTENTS:
+--------------------------------------------------------------------------------
+1. Why Deploy on a VPS / Coolify? (Heroku vs VPS Comparison)
+2. Prerequisites (VPS Specs, Git Repo & Demo Credentials)
+3. METHOD 1: Deployment via Coolify (Recommended UI Method)
+   - Step-by-Step UI Setup
+   - Environment Variables Configuration
+   - Persistent Volumes & Storage
+   - Domain, Port & SSL Setup
+   - Healthcheck & Auto-Restart Settings
+4. METHOD 2: Direct Deployment via Docker Compose on Ubuntu VPS (CLI)
+5. METHOD 3: Native Systemd Service Deployment on Linux VPS
+6. Ensuring 24/7 Zero-Downtime Operation & Auto-Recovery
+7. Real-Time Monitoring & Web Dashboard Access
+8. Troubleshooting & Maintenance Commands
+================================================================================
+
+
+================================================================================
+1. WHY DEPLOY ON A VPS / COOLIFY?
+================================================================================
+- No Dyno Sleep / Restarts: Heroku dynos restart every 24 hours and sleep on
+  free/eco tiers. A VPS runs continuously without interruptions.
+- Persistent MetaTrader 5 Session: Wine MT5 stays logged into your broker
+  account 24/7 with active websocket/TCP socket connections.
+- Lower Latency: VPS located near your broker's server (e.g., London / New York /
+  Frankfurt) executes orders in 1-5ms instead of 100-300ms.
+- Full Resource Control: Full access to CPU, RAM, disk, and auto-restart policies.
+
+
+================================================================================
+2. PREREQUISITES
+================================================================================
+- Recommended VPS: Ubuntu 22.04 or 24.04 LTS (Hetzner, DigitalOcean, Vultr, Contabo)
+- Minimum Specs: 2 vCPU, 2 GB - 4 GB RAM, 20 GB SSD.
+- Coolify: Installed on your VPS (or install via `curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash`)
+- Git Repository: https://github.com/BeeSeek-LTD/TradingBot.git
+- MT5 Demo Account:
+    * Login: 5055872290
+    * Password: [YOUR_MT5_PASSWORD]
+    * Server: MetaQuotes-Demo
+
+
+================================================================================
+3. METHOD 1: DEPLOYMENT VIA COOLIFY (RECOMMENDED)
+================================================================================
+
+Coolify is an open-source, self-hosted Heroku/Netlify alternative. It builds
+your Dockerfile, manages environment variables, provisions SSL certificates,
+and restarts containers automatically if they ever crash.
+
+STEP 1: Log in to your Coolify Dashboard
+--------------------------------------------------------------------------------
+1. Navigate to your Coolify web UI (e.g., http://your-vps-ip:8000 or https://coolify.yourdomain.com).
+2. Click on "Projects" -> Select or Create a Project (e.g., "Trading").
+3. Click "+ New" -> Select "Application".
+
+STEP 2: Connect Git Repository
+--------------------------------------------------------------------------------
+1. Choose "Public Repository" (or "Private Repository via GitHub App / Deploy Key").
+2. Enter Repository URL:
+   git@github.com:BeeSeek-LTD/TradingBot.git
+   (or https://github.com/BeeSeek-LTD/TradingBot.git)
+3. Branch: main
+4. Build Pack: Select "Dockerfile" (Coolify will detect the included Dockerfile).
+
+STEP 3: Configure Environment Variables (from data.env)
+--------------------------------------------------------------------------------
+In the Coolify Application Settings, navigate to the "Environment Variables" tab
+and add the following variables:
+
+| Variable Name           | Value                | Description                      |
+| :---------------------- | :------------------- | :------------------------------- |
+| BOT_MODE                | live                 | Live MT5 execution via Wine      |
+| EXECUTION_MODE          | LIVE                 | Ensures live trading engine      |
+| MT5_LOGIN               | 5055872290           | MT5 Account ID                   |
+| MT5_ACCOUNT             | 5055872290           | Fallback account identifier      |
+| MT5_PASSWORD            | RhPwCr*0             | MT5 Account Password             |
+| MT5_SERVER              | MetaQuotes-Demo      | Broker Server Name               |
+| ACCOUNT_BALANCE         | 100.0                | Initial capital / fallback ($)   |
+| INITIAL_BALANCE         | 100.0                | Dynamic sizing baseline ($)      |
+| PORT                    | 8080                 | Web Dashboard HTTP Port          |
+| HOST                    | 0.0.0.0              | Bind address                     |
+| ENABLE_WEB_DASHBOARD    | true                 | Enables Web UI & log streamer    |
+
+STEP 4: Set Persistent Storage (Volume Mount)
+--------------------------------------------------------------------------------
+To ensure trade logs and historical performance persist across rebuilds:
+1. In Coolify, go to "Storages" / "Persistent Volumes".
+2. Add a new volume mount:
+   - Volume Name: tradingbot_logs
+   - Destination Path inside container: /app/logs
+3. (Optional) Add dataset storage:
+   - Destination Path: /app/data
+
+STEP 5: Configure Networking, Domain & SSL
+--------------------------------------------------------------------------------
+1. In the "General" tab:
+   - Ports Exposes: 8080
+2. Under "Domains", enter your domain or subdomain:
+   Example: https://bot.yourdomain.com
+   (Coolify will automatically generate a free Let's Encrypt SSL certificate
+   and configure reverse proxy routing via Traefik).
+3. If not using a domain, you can access directly via:
+   http://YOUR_VPS_IP:8080
+
+STEP 6: Configure Health Check & Auto-Restart
+--------------------------------------------------------------------------------
+1. Healthcheck URL: /health
+2. Restart Policy: Always (or Unless Stopped)
+3. Click "Deploy" button. Coolify will build the Docker container with Wine,
+   MetaTrader 5, Xvfb display, and start the trading bot 24/7.
+
+
+================================================================================
+4. METHOD 2: DIRECT DEPLOYMENT VIA DOCKER COMPOSE ON UBUNTU VPS (CLI)
+================================================================================
+
+If you prefer deploying via terminal on any standard Linux VPS:
+
+STEP 1: Connect to VPS via SSH
+--------------------------------------------------------------------------------
+ssh root@YOUR_VPS_IP
+
+STEP 2: Install Docker & Docker Compose (if not already installed)
+--------------------------------------------------------------------------------
+curl -fsSL https://get.docker.com -o get-docker.sh
+sh get-docker.sh
+apt-get install -y docker-compose-plugin
+
+STEP 3: Clone Repository
+--------------------------------------------------------------------------------
+git clone https://github.com/BeeSeek-LTD/TradingBot.git /opt/TradingBot
+cd /opt/TradingBot
+
+STEP 4: Create / Verify data.env File
+--------------------------------------------------------------------------------
+cat << 'EOF' > data.env
+MT5_LOGIN=5055872290
+MT5_ACCOUNT=5055872290
+MT5_PASSWORD=RhPwCr*0
+MT5_SERVER=MetaQuotes-Demo
+MT5_PATH=
+EXECUTION_MODE=LIVE
+BOT_MODE=live
+ACCOUNT_BALANCE=100.0
+INITIAL_BALANCE=100.0
+PORT=8080
+HOST=0.0.0.0
+ENABLE_WEB_DASHBOARD=true
+EOF
+
+STEP 5: Launch with Docker Compose in Detached (Background) Mode
+--------------------------------------------------------------------------------
+docker compose up -d --build forexbot-live
+
+STEP 6: Verify Container Status & Logs
+--------------------------------------------------------------------------------
+# Check running containers:
+docker ps
+
+# Stream live container logs:
+docker logs -f forexbot_live
+
+
+================================================================================
+5. METHOD 3: NATIVE SYSTEMD SERVICE ON LINUX VPS (WITHOUT DOCKER)
+================================================================================
+
+For maximum efficiency and direct hardware access:
+
+STEP 1: Install Wine & Run Setup Script
+--------------------------------------------------------------------------------
+sudo dpkg --add-architecture i386
+sudo apt update && sudo apt install -y wine64 wine32 xvfb curl unzip python3-venv
+
+cd /opt/TradingBot
+./run_live_wine.sh
+
+STEP 2: Create Systemd Background Service
+--------------------------------------------------------------------------------
+sudo cat << 'EOF' > /etc/systemd/system/forexbot.service
+[Unit]
+Description=ForexBot 24/7 MT5 Live Trading Engine
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/TradingBot
+EnvironmentFile=/opt/TradingBot/data.env
+ExecStart=/bin/bash /opt/TradingBot/run_live_wine.sh
+Restart=always
+RestartSec=10
+StandardOutput=append:/opt/TradingBot/logs/systemd.log
+StandardError=append:/opt/TradingBot/logs/systemd_err.log
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+STEP 3: Enable & Start the Service
+--------------------------------------------------------------------------------
+sudo systemctl daemon-reload
+sudo systemctl enable forexbot
+sudo systemctl start forexbot
+
+# Check status:
+sudo systemctl status forexbot
+
+
+================================================================================
+6. ENSURING 24/7 ZERO-DOWNTIME OPERATION & AUTO-RECOVERY
+================================================================================
+1. Auto-Restart Policy: Both Coolify (`restart: always`) and Systemd
+   (`Restart=always`) automatically relaunch the bot if the process ever halts.
+2. Market Hours Awareness: Forex markets run 24 hours / 5 days a week (Monday
+   00:00 UTC through Friday 21:00 UTC). Over the weekend, the bot enters
+   `WEEKEND` waiting state automatically and resumes trading at Sunday/Monday market open.
+3. Socket Reconnect: The bot's `MetaTraderClient` periodically verifies connection
+   heartbeats and re-authenticates to `MetaQuotes-Demo` automatically if network drops.
+4. Uptime Monitoring (Recommended Free Services):
+   - Set up an HTTP monitor on https://uptimerobot.com or https://betterstack.com
+   - Target URL: http://YOUR_VPS_IP:8080/health (or https://bot.yourdomain.com/health)
+   - Interval: Every 5 minutes
+   - If the endpoint ever fails to reply with HTTP 200 OK, you will receive an instant alert.
+
+
+================================================================================
+7. REAL-TIME MONITORING & WEB DASHBOARD ACCESS
+================================================================================
+Once deployed on your VPS, you have access to real-time dashboards:
+
+1. Web Status Dashboard:
+   http://YOUR_VPS_IP:8080/
+   (Displays Account Balance, Equity, Drawdown, Active Pairs, Open Trades, Engine Status)
+
+2. Live Log Streaming Terminal:
+   http://YOUR_VPS_IP:8080/live-log
+   (Interactive browser console streaming live logs with search, auto-scroll & level filters)
+
+3. Health JSON Endpoint:
+   http://YOUR_VPS_IP:8080/health
+
+4. Raw Logs API:
+   http://YOUR_VPS_IP:8080/api/logs
+
+
+================================================================================
+8. TROUBLESHOOTING & MAINTENANCE COMMANDS
+================================================================================
+- View Live Logs:
+  docker logs -f forexbot_live
+
+- Restart Bot:
+  docker restart forexbot_live
+
+- Update Bot to Latest Git Commit:
+  cd /opt/TradingBot
+  git pull origin main
+  docker compose up -d --build forexbot-live
+
+- Check Disk & Memory Usage:
+  docker stats forexbot_live
+  df -h
+================================================================================

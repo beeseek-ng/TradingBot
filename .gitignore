@@ -32,3 +32,9 @@ Thumbs.db
 /tmp/
 *.xlsx
 *.csv
+
+# Environment & Secrets
+.env
+data.env
+*.env
+!data.env.example

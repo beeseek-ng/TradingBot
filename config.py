@@ -12,7 +12,7 @@ import os
 
 
 # ---------------------------------------------------------------------------
-# Base Paths
+# Base Paths & Environment File Loading
 # ---------------------------------------------------------------------------
 BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data"
@@ -20,6 +20,31 @@ LOGS_DIR = BASE_DIR / "logs"
 
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 LOGS_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _load_env_file(filepath: Path) -> None:
+    """Loads key-value pairs from an env file into os.environ if not already set."""
+    if not filepath.is_file():
+        return
+    try:
+        with open(filepath, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                if "=" in line:
+                    key, val = line.split("=", 1)
+                    key = key.strip()
+                    val = val.strip().strip("'\"")
+                    if key and key not in os.environ:
+                        os.environ[key] = val
+    except Exception:
+        pass
+
+
+# Automatically load data.env and .env if present
+_load_env_file(BASE_DIR / "data.env")
+_load_env_file(BASE_DIR / ".env")
 
 
 # ---------------------------------------------------------------------------

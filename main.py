@@ -167,9 +167,20 @@ class MT5Client:
                 return False
 
             self.is_connected = True
+            term_trade_allowed = getattr(terminal_info, "trade_allowed", True) if terminal_info else True
+            acc_trade_allowed = getattr(account_info, "trade_allowed", True) if account_info else True
+            acc_trade_expert = getattr(account_info, "trade_expert", True) if account_info else True
+
             logger.info(f"Connected to MT5 successfully | Account: {account_info.login} | "
                         f"Server: {account_info.server} | Balance: ${account_info.balance:,.2f} | "
                         f"Equity: ${account_info.equity:,.2f} | Currency: {account_info.currency}")
+            logger.info(f"MT5 Trade Status: Terminal AlgoTrading={term_trade_allowed}, "
+                        f"Account TradeAllowed={acc_trade_allowed}, Account TradeExpert={acc_trade_expert}")
+            
+            if not term_trade_allowed:
+                logger.warning("[ForexBot] WARNING: MT5 terminal has 'Algo Trading' disabled! Auto-trades will be rejected with retcode 10027.")
+            if not acc_trade_allowed or not acc_trade_expert:
+                logger.warning("[ForexBot] WARNING: Account does not have full trading permissions. Ensure master trading password was used instead of investor password.")
             return True
 
         except Exception as ex:
@@ -658,6 +669,10 @@ class OrderExecutor:
                             logger.info(f"ORDER FILLED (Reduced Volume): Ticket #{result_retry.order} | Volume: {result_retry.volume} | Price: {result_retry.price}")
                             return True
                     logger.error(f"Order send failed: Insufficient margin for {signal.symbol}. Balance/Margin too low.")
+                    return False
+                elif result and result.retcode == 10027:  # AutoTrading disabled by client
+                    logger.error(f"[ForexBot] Order rejected (retcode 10027: 'AutoTrading disabled by client').")
+                    logger.error(f"[ForexBot] FIX: MT5 terminal requires 'Algo Trading' enabled (ExpertsEnable=1 in common.ini / terminal.ini).")
                     return False
                 else:
                     logger.error(f"Order send failed: {result}")

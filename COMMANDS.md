@@ -169,5 +169,5 @@ heroku ps:scale web=1
 heroku logs --tail
 heroku open
 ```
-*(For complete details, see [HEROKU_DEPLOYMENT_GUIDE.md](file:///home/solodev/Documents/Trading_Bot/HEROKU_DEPLOYMENT_GUIDE.md)).*
+*(For complete details, see [HEROKU_DEPLOYMENT_GUIDE.md](file:///home/solodev/Documents/Trading_Bot/HEROKU_DEPLOYMENT_GUIDE.md) and [deplo.guide.text](file:///home/solodev/Documents/Trading_Bot/deplo.guide.text) for Coolify/VPS 24/7).*
 

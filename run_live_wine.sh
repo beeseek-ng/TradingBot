@@ -5,6 +5,19 @@
 
 set -e
 
+# Load environment file if present (data.env or .env)
+if [ -f "data.env" ]; then
+    echo "[INFO] Loading environment variables from data.env..."
+    set -a
+    . ./data.env
+    set +a
+elif [ -f ".env" ]; then
+    echo "[INFO] Loading environment variables from .env..."
+    set -a
+    . ./.env
+    set +a
+fi
+
 WINE_PREFIX_DIR="${WINEPREFIX:-$HOME/.mt5}"
 PYTHON_DIR="$WINE_PREFIX_DIR/drive_c/Python39"
 
@@ -47,6 +60,59 @@ fi
 # 5. Install required packages (MetaTrader5, pandas, numpy, tabulate)
 echo "[INFO] Ensuring MetaTrader5 and dependencies are installed..."
 WINEPREFIX="$WINE_PREFIX_DIR" WINEDEBUG=-all wine "C:\\Python39\\Scripts\\pip.exe" install --quiet MetaTrader5 "numpy<2" pandas tabulate
+
+# 6. Configure MT5 AutoTrading and Expert Advisor settings
+configure_mt5_autotrading() {
+    echo "[INFO] Configuring MT5 AutoTrading and Expert Advisor permissions..."
+    local config_dirs=(
+        "$WINE_PREFIX_DIR/drive_c/Program Files/MetaTrader 5/config"
+        "$WINE_PREFIX_DIR/drive_c/Program Files/MetaTrader 5/bases"
+        "$WINE_PREFIX_DIR/drive_c/users/$(whoami)/AppData/Roaming/MetaQuotes/Terminal/Common"
+        "$WINE_PREFIX_DIR/drive_c/users/$(whoami)/Application Data/MetaQuotes/Terminal/Common"
+    )
+
+    for cfg_dir in "${config_dirs[@]}"; do
+        mkdir -p "$cfg_dir"
+        cat << 'EOF' > "$cfg_dir/common.ini"
+[Common]
+ExpertsEnable=1
+ExpertsDll=1
+ExpertsExp=1
+ExpertsTrades=1
+
+[Experts]
+AllowLiveTrading=1
+AllowDllImport=1
+Enabled=1
+Account=1
+Profile=1
+Chart=1
+Market=1
+News=1
+Signal=1
+EOF
+        cat << 'EOF' > "$cfg_dir/terminal.ini"
+[Common]
+ExpertsEnable=1
+ExpertsDll=1
+ExpertsExp=1
+ExpertsTrades=1
+
+[Experts]
+AllowLiveTrading=1
+AllowDllImport=1
+Enabled=1
+Account=1
+Profile=1
+Chart=1
+Market=1
+News=1
+Signal=1
+EOF
+    done
+}
+
+configure_mt5_autotrading || true
 
 echo ""
 echo "=================================================="

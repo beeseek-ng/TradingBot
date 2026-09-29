@@ -17,6 +17,8 @@ from pathlib import Path
 from typing import Any, Dict, List
 from urllib.parse import parse_qs, urlparse
 
+import config
+
 logger = logging.getLogger("ForexBot.Web")
 
 # Log file path
