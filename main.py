@@ -178,7 +178,25 @@ class MT5Client:
                         f"Account TradeAllowed={acc_trade_allowed}, Account TradeExpert={acc_trade_expert}")
             
             if not term_trade_allowed:
-                logger.warning("[ForexBot] WARNING: MT5 terminal has 'Algo Trading' disabled! Auto-trades will be rejected with retcode 10027.")
+                logger.warning("[ForexBot] WARNING: MT5 terminal has 'Algo Trading' disabled. Attempting automated shortcut toggle...")
+                try:
+                    import subprocess
+                    subprocess.run(
+                        ["xdotool", "search", "--name", "MetaTrader", "key", "ctrl+e"],
+                        env=dict(os.environ, DISPLAY=os.getenv("DISPLAY", ":99")),
+                        timeout=5,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL
+                    )
+                    time.sleep(1.0)
+                    terminal_info = mt5.terminal_info()
+                    term_trade_allowed = getattr(terminal_info, "trade_allowed", False) if terminal_info else False
+                    if term_trade_allowed:
+                        logger.info("[ForexBot] MT5 Algo Trading successfully toggled ON (trade_allowed=True)!")
+                    else:
+                        logger.warning("[ForexBot] WARNING: MT5 terminal has 'Algo Trading' disabled! Auto-trades will be rejected with retcode 10027.")
+                except Exception as ex:
+                    logger.debug(f"xdotool Algo Trading toggle error: {ex}")
             if not acc_trade_allowed or not acc_trade_expert:
                 logger.warning("[ForexBot] WARNING: Account does not have full trading permissions. Ensure master trading password was used instead of investor password.")
             return True
