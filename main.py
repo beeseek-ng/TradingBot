@@ -116,6 +116,12 @@ class MT5Client:
             }
             if self.config.PATH:
                 init_kwargs["path"] = self.config.PATH
+            if self.config.LOGIN:
+                init_kwargs["login"] = int(self.config.LOGIN)
+            if self.config.PASSWORD:
+                init_kwargs["password"] = str(self.config.PASSWORD)
+            if self.config.SERVER:
+                init_kwargs["server"] = str(self.config.SERVER)
 
             initialized = False
             for attempt in range(1, 4):
@@ -144,6 +150,14 @@ class MT5Client:
                     logger.error(f"MT5 login failed for user {self.config.LOGIN}: {err}")
                     mt5.shutdown()
                     return False
+
+            # Allow MT5 terminal network handshake with broker server
+            logger.info("Waiting for MT5 broker server synchronization...")
+            for _ in range(15):
+                term = mt5.terminal_info()
+                if term and term.connected:
+                    break
+                time.sleep(1.0)
 
             terminal_info = mt5.terminal_info()
             account_info = mt5.account_info()
@@ -179,10 +193,13 @@ class MT5Client:
 
         try:
             term = mt5.terminal_info()
-            if term is None or not term.connected:
-                logger.warning("MT5 connection drop detected. Reconnecting...")
+            if term is None:
+                logger.warning("MT5 terminal_info is None. Reconnecting...")
                 self.is_connected = False
                 return self.connect()
+            if not term.connected:
+                # MT5 process is alive, terminal is momentarily syncing with broker
+                return True
             return True
         except Exception as ex:
             logger.error(f"Connection check failed: {ex}. Reconnecting...")
@@ -196,33 +213,37 @@ class MT5Client:
         try:
             selected = mt5.symbol_select(symbol, True)
             if not selected:
-                logger.error(f"Failed to select symbol '{symbol}' in Market Watch.")
-            return selected
+                logger.warning(f"Failed to select symbol '{symbol}' in Market Watch.")
+            # Warm up history download
+            mt5.copy_rates_from_pos(symbol, mt5.TIMEFRAME_M15, 0, 10)
+            return True
         except Exception as ex:
             logger.error(f"Error selecting symbol '{symbol}': {ex}")
             return False
 
     def get_rates(self, symbol: str, timeframe: int, count: int) -> Optional[pd.DataFrame]:
         """
-        Fetches the latest `count` completed candles for a symbol.
+        Fetches the latest `count` completed candles for a symbol with retries.
         Returns a formatted pandas DataFrame.
         """
         if not MT5_AVAILABLE:
             return None
 
-        try:
-            rates = mt5.copy_rates_from_pos(symbol, timeframe, 0, count)
-            if rates is None or len(rates) == 0:
-                err = mt5.last_error()
-                logger.warning(f"No rates returned for {symbol}: {err}")
-                return None
+        for attempt in range(3):
+            try:
+                rates = mt5.copy_rates_from_pos(symbol, timeframe, 0, count)
+                if rates is not None and len(rates) > 0:
+                    df = pd.DataFrame(rates)
+                    df["time"] = pd.to_datetime(df["time"], unit="s")
+                    return df
+                time.sleep(1.0)
+            except Exception as ex:
+                logger.error(f"Exception in get_rates for {symbol}: {ex}")
+                time.sleep(1.0)
 
-            df = pd.DataFrame(rates)
-            df["time"] = pd.to_datetime(df["time"], unit="s")
-            return df
-        except Exception as ex:
-            logger.error(f"Exception in get_rates for {symbol}: {ex}")
-            return None
+        err = mt5.last_error()
+        logger.warning(f"No rates returned for {symbol} after retries: {err}")
+        return None
 
     def get_account_equity_and_balance(self) -> Tuple[float, float]:
         """Returns (equity, balance). Fallback to (0.0, 0.0) on error."""

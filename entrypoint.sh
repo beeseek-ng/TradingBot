@@ -42,6 +42,7 @@ fi
 
 # Function to start virtual framebuffer for headless Wine GUI operations
 start_xvfb() {
+    rm -f /tmp/.X99-lock /tmp/.X11-unix/X99 2>/dev/null || true
     if ! pgrep -x "Xvfb" > /dev/null; then
         echo "[INFO] Starting virtual framebuffer Xvfb on display :99..."
         Xvfb :99 -screen 0 1024x768x16 -nolisten tcp &
