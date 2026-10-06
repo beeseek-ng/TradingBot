@@ -87,6 +87,91 @@ def setup_logger(name: str = "ForexBot") -> logging.Logger:
 logger = setup_logger("ForexBot")
 
 
+def auto_enable_mt5_autotrading() -> bool:
+    """
+    Automatically enables MT5 'Algo Trading' (AutoTrading) in the terminal
+    by sending the Ctrl+E hotkey to the MetaTrader 5 window via Win32 API
+    and X11 xdotool. Works natively on Windows, under Wine, and Linux Xvfb.
+    """
+    success = False
+
+    # 1. Try Win32 API keybd_event if under Windows or Wine Python
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            user32 = ctypes.windll.user32
+
+            hwnd_targets = []
+
+            def _enum_cb(hwnd, lparam):
+                if user32.IsWindowVisible(hwnd):
+                    length = user32.GetWindowTextLengthW(hwnd)
+                    if length > 0:
+                        buf = ctypes.create_unicode_buffer(length + 1)
+                        user32.GetWindowTextW(hwnd, buf, length + 1)
+                        title = buf.value
+                        if "MetaTrader" in title or "MetaQuotes" in title or "5055872290" in title:
+                            hwnd_targets.append(hwnd)
+                return True
+
+            WNDENUMPROC = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_int, ctypes.c_int)
+            user32.EnumWindows(WNDENUMPROC(_enum_cb), 0)
+
+            VK_CONTROL = 0x11
+            VK_E = 0x45
+            KEYEVENTF_KEYUP = 0x0002
+
+            if hwnd_targets:
+                for hwnd in hwnd_targets:
+                    try:
+                        user32.ShowWindow(hwnd, 9)  # SW_RESTORE
+                        user32.SetForegroundWindow(hwnd)
+                        time.sleep(0.2)
+                        user32.keybd_event(VK_CONTROL, 0, 0, 0)
+                        user32.keybd_event(VK_E, 0, 0, 0)
+                        time.sleep(0.1)
+                        user32.keybd_event(VK_E, 0, KEYEVENTF_KEYUP, 0)
+                        user32.keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0)
+                        time.sleep(0.3)
+                    except Exception:
+                        pass
+            else:
+                user32.keybd_event(VK_CONTROL, 0, 0, 0)
+                user32.keybd_event(VK_E, 0, 0, 0)
+                time.sleep(0.1)
+                user32.keybd_event(VK_E, 0, KEYEVENTF_KEYUP, 0)
+                user32.keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0)
+                time.sleep(0.3)
+
+            success = True
+        except Exception as ex:
+            logger.debug(f"auto_enable_mt5_autotrading Win32 exception: {ex}")
+
+    # 2. Try xdotool if running in Linux Xvfb environment
+    try:
+        import subprocess
+        display = os.getenv("DISPLAY", ":99")
+        subprocess.run(
+            ["xdotool", "key", "ctrl+e"],
+            env=dict(os.environ, DISPLAY=display),
+            timeout=3,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+        subprocess.run(
+            ["xdotool", "search", "--name", "MetaTrader", "windowactivate", "--sync", "key", "ctrl+e"],
+            env=dict(os.environ, DISPLAY=display),
+            timeout=3,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+        success = True
+    except Exception:
+        pass
+
+    return success
+
+
 # ---------------------------------------------------------------------------
 # MT5 Client & Connection Manager
 # ---------------------------------------------------------------------------
@@ -171,6 +256,22 @@ class MT5Client:
             acc_trade_allowed = getattr(account_info, "trade_allowed", True) if account_info else True
             acc_trade_expert = getattr(account_info, "trade_expert", True) if account_info else True
 
+            # If AutoTrading is disabled in MT5, automatically trigger Ctrl+E hotkey
+            if not term_trade_allowed:
+                logger.info("[ForexBot] MT5 terminal has 'Algo Trading' disabled. Triggering automated Ctrl+E hotkey activation...")
+                auto_enable_mt5_autotrading()
+                time.sleep(1.0)
+                terminal_info = mt5.terminal_info()
+                term_trade_allowed = getattr(terminal_info, "trade_allowed", False) if terminal_info else False
+                if term_trade_allowed:
+                    logger.info("[ForexBot] SUCCESS: MT5 'Algo Trading' has been activated automatically!")
+                else:
+                    logger.info("[ForexBot] Retrying automated Algo Trading activation...")
+                    auto_enable_mt5_autotrading()
+                    time.sleep(1.0)
+                    terminal_info = mt5.terminal_info()
+                    term_trade_allowed = getattr(terminal_info, "trade_allowed", False) if terminal_info else False
+
             logger.info(f"Connected to MT5 successfully | Account: {account_info.login} | "
                         f"Server: {account_info.server} | Balance: ${account_info.balance:,.2f} | "
                         f"Equity: ${account_info.equity:,.2f} | Currency: {account_info.currency}")
@@ -178,25 +279,7 @@ class MT5Client:
                         f"Account TradeAllowed={acc_trade_allowed}, Account TradeExpert={acc_trade_expert}")
             
             if not term_trade_allowed:
-                logger.warning("[ForexBot] WARNING: MT5 terminal has 'Algo Trading' disabled. Attempting automated shortcut toggle...")
-                try:
-                    import subprocess
-                    subprocess.run(
-                        ["xdotool", "search", "--name", "MetaTrader", "key", "ctrl+e"],
-                        env=dict(os.environ, DISPLAY=os.getenv("DISPLAY", ":99")),
-                        timeout=5,
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.DEVNULL
-                    )
-                    time.sleep(1.0)
-                    terminal_info = mt5.terminal_info()
-                    term_trade_allowed = getattr(terminal_info, "trade_allowed", False) if terminal_info else False
-                    if term_trade_allowed:
-                        logger.info("[ForexBot] MT5 Algo Trading successfully toggled ON (trade_allowed=True)!")
-                    else:
-                        logger.warning("[ForexBot] WARNING: MT5 terminal has 'Algo Trading' disabled! Auto-trades will be rejected with retcode 10027.")
-                except Exception as ex:
-                    logger.debug(f"xdotool Algo Trading toggle error: {ex}")
+                logger.warning("[ForexBot] NOTICE: MT5 terminal reported trade_allowed=False. Automated hotkey activator is armed to toggle Algo Trading ON upon trade signals.")
             if not acc_trade_allowed or not acc_trade_expert:
                 logger.warning("[ForexBot] WARNING: Account does not have full trading permissions. Ensure master trading password was used instead of investor password.")
             return True
@@ -636,6 +719,17 @@ class OrderExecutor:
                             )
                             return False
 
+        # Pre-check MT5 AlgoTrading status before sending order
+        if MT5_AVAILABLE and not self.is_paper:
+            try:
+                term = mt5.terminal_info()
+                if term and not term.trade_allowed:
+                    logger.info("[ForexBot] Pre-flight check: 'Algo Trading' is OFF in MT5. Triggering automated hotkey activation...")
+                    auto_enable_mt5_autotrading()
+                    time.sleep(0.5)
+            except Exception:
+                pass
+
         default_filling = self._determine_filling_mode(signal.symbol)
         request = {
             "action": mt5.TRADE_ACTION_DEAL,
@@ -689,9 +783,20 @@ class OrderExecutor:
                     logger.error(f"Order send failed: Insufficient margin for {signal.symbol}. Balance/Margin too low.")
                     return False
                 elif result and result.retcode == 10027:  # AutoTrading disabled by client
-                    logger.error(f"[ForexBot] Order rejected (retcode 10027: 'AutoTrading disabled by client').")
-                    logger.error(f"[ForexBot] FIX: MT5 terminal requires 'Algo Trading' enabled (ExpertsEnable=1 in common.ini / terminal.ini).")
-                    return False
+                    logger.warning("[ForexBot] Broker returned retcode 10027 ('AutoTrading disabled by client').")
+                    logger.info("[ForexBot] Activating MT5 'Algo Trading' via automated hotkey and retrying order immediately...")
+                    auto_enable_mt5_autotrading()
+                    time.sleep(1.0)
+                    result_retry = mt5.order_send(request)
+                    if result_retry and result_retry.retcode == mt5.TRADE_RETCODE_DONE:
+                        logger.info(f"ORDER FILLED (AutoTrading Activated): Ticket #{result_retry.order} | Volume: {result_retry.volume} | Price: {result_retry.price}")
+                        return True
+                    elif result_retry and result_retry.retcode != 10027:
+                        # Process other response codes or filling mode trial
+                        continue
+                    else:
+                        logger.error(f"[ForexBot] Order send retry failed: {result_retry}")
+                        return False
                 else:
                     logger.error(f"Order send failed: {result}")
                     return False

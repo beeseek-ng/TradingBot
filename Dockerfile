@@ -24,6 +24,7 @@ RUN dpkg --add-architecture i386 && \
         gnupg \
         unzip \
         xvfb \
+        xdotool \
         procps \
         git \
         python3 \

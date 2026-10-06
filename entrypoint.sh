@@ -138,6 +138,20 @@ EOF
     done
 }
 
+# Background daemon to ensure AlgoTrading is activated on X11
+activate_x11_autotrading() {
+    (
+        sleep 12
+        for i in 1 2 3 4 5; do
+            if command -v xdotool > /dev/null && [ -n "$DISPLAY" ]; then
+                DISPLAY=:99 xdotool key ctrl+e 2>/dev/null || true
+                DISPLAY=:99 xdotool search --name "MetaTrader" windowactivate --sync key ctrl+e 2>/dev/null || true
+            fi
+            sleep 6
+        done
+    ) &
+}
+
 # 1. Live Mode with MT5 on Wine
 if [ "$BOT_MODE" = "live" ]; then
     echo "[INFO] Attempting to start ForexBot in LIVE MetaTrader 5 mode under Wine..."
@@ -149,6 +163,7 @@ if [ "$BOT_MODE" = "live" ]; then
     export PYTHONIOENCODING="utf-8"
     ensure_mt5_terminal || true
     configure_mt5_autotrading || true
+    activate_x11_autotrading || true
     
     if [ -f "$PYTHON_WINE_EXE" ]; then
         echo "[INFO] Launching Wine Python MT5 Bridge ($PYTHON_WINE_EXE)..."
