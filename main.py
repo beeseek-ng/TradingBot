@@ -613,6 +613,10 @@ class OrderExecutor:
         self.virtual_positions: List[Dict] = []
         self.ticket_counter = 1001
 
+    @property
+    def is_paper(self) -> bool:
+        return isinstance(self.client, PaperClient)
+
     def get_open_positions(self, symbol: Optional[str] = None) -> List:
         """Fetches all open positions."""
         if not MT5_AVAILABLE or isinstance(self.client, PaperClient):
