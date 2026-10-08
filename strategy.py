@@ -1,21 +1,33 @@
 """
-ForexBot Strategy Engine (SLK + CRT + ABC/XYZ Multi-Timeframe Framework)
-========================================================================
+ForexBot Strategy Engine (SLK + CRT + Institutional Price Action Framework)
+===========================================================================
 Institutional Price Action & Market Storyline Signal Generation Engine:
-1. SLK (Structure, Liquidity, Key Level):
-   - Market Environment: UPTREND, DOWNTREND, RANGING, CHOPPY
-   - Market Phase: EXPANSION vs REVERSAL
-   - Origin & Destination: Where price is coming from -> Where price is going
-2. CRT (Candle Range Theory):
-   - Candle High/Low sweep with candle closing back inside the range.
-   - 3rd candle reaction from Key Levels (Open/Close, V-Shape, A-Shape, FVG, OB).
-3. ABC (HTF Expectation) -> XYZ (LTF Execution):
-   - HTF (Weekly / Daily / 4H / 2H) bias & liquidity sweep + breakout.
-   - LTF (2H / 1H / 15M) London & New York session execution on disrespected
-     key level flip into Imbalance (FVG) + Liquidity Sweep confirmation.
-4. Risk/Reward:
-   - Fixed Stop Loss: 50.0 pips
-   - Fixed Take Profit: 150.0 pips (TP1) / 250.0 pips (TP2)
+
+1. HTF Bias & Market Structure Shift (Weekly / Daily / 4H / 2H):
+   - Bullish Trend: High Liquidity Sweep + Break of Structure (BOS/MSS) to downside
+     shifts bias to BEARISH -> targets Sells during Expansion phase.
+   - Bearish Trend: Low Liquidity Sweep + Break of Structure (BOS/MSS) to upside
+     shifts bias to BULLISH -> targets Buys during Expansion phase.
+
+2. Basics of Key Levels & Flip Logic:
+   - A-shape key level or bearish open/close: Used for Sells UNLESS disrespected
+     to the upside -> then serves as bullish support flip.
+   - V-shape key level or bullish open/close: Used for Buys UNLESS disrespected
+     to the downside -> then serves as bearish resistance flip.
+
+3. Plug and Play Continuation / Disrespected Key Level Setup:
+   - Bullish Setup: Disrespected A-shape / bearish open-close level + pullback to level
+     + liquidity resting close + sweep of liquidity candle low + FVG confluence
+     (High Probability) + Fib Discount OTE (0.50-0.786) + Bullish Candlestick Pattern.
+   - Dynamic Stop Loss: Placed a few pips below the wick of the sweep candle.
+   - Dynamic Take Profit: Placed at next key level or liquidity pool (IRL / ERL).
+
+4. Candle Pattern Formations & Confluence:
+   - Engulfing (Bullish / Bearish), Hammer / Shooting Star (Pin Bar),
+     Morning Star / Evening Star, Harami, and Doji rejection.
+
+5. Fibonacci Retracement Confluence:
+   - OTE / Discount zone (0.50, 0.618, 0.705, 0.786) for high-probability execution.
 """
 
 from dataclasses import dataclass, field
@@ -61,6 +73,21 @@ class KeyLevelType(str, Enum):
     OPEN_CLOSE_LEVEL = "OPEN_CLOSE_LEVEL"      # Horizontal Open/Close cluster
     FAIR_VALUE_GAP = "FAIR_VALUE_GAP"          # 3-candle imbalance (FVG)
     ORDER_BLOCK = "ORDER_BLOCK"                # Last opposing candle before displacement
+    LIQUIDITY_POOL = "LIQUIDITY_POOL"          # Resting liquidity (IRL / ERL)
+
+
+class CandlePatternType(str, Enum):
+    """Recognized candlestick pattern formations."""
+    BULLISH_ENGULFING = "BULLISH_ENGULFING"
+    BEARISH_ENGULFING = "BEARISH_ENGULFING"
+    HAMMER_PINBAR = "HAMMER_PINBAR"
+    SHOOTING_STAR_PINBAR = "SHOOTING_STAR_PINBAR"
+    MORNING_STAR = "MORNING_STAR"
+    EVENING_STAR = "EVENING_STAR"
+    BULLISH_HARAMI = "BULLISH_HARAMI"
+    BEARISH_HARAMI = "BEARISH_HARAMI"
+    DOJI_REJECTION = "DOJI_REJECTION"
+    NONE = "NONE"
 
 
 @dataclass
@@ -86,6 +113,8 @@ class CRTSweep:
     candle_time: Any
     timeframe: str
     target_liquidity: float
+    sweep_candle_low: float = 0.0
+    sweep_candle_high: float = 0.0
 
 
 @dataclass
@@ -97,6 +126,10 @@ class MarketStoryline:
     destination_liquidity: str # Where price is likely going next
     htf_bias: SignalType       # Expected directional bias (BUY / SELL / HOLD)
     rationale: str
+    bos_detected: bool = False
+    liquidity_swept: bool = False
+    fib_zone: str = "NEUTRAL"
+    pattern: CandlePatternType = CandlePatternType.NONE
 
 
 @dataclass
@@ -126,12 +159,146 @@ class TradeSignal:
 
 
 # ---------------------------------------------------------------------------
-# 1. Market Environment & Phase Classifier
+# 1. Candlestick Pattern Classifier
+# ---------------------------------------------------------------------------
+class CandlePatternClassifier:
+    """
+    Identifies high-probability candlestick reversal and confirmation formations:
+    Engulfing, Hammer (Pinbar), Shooting Star, Morning/Evening Star, Harami, Doji.
+    """
+
+    @staticmethod
+    def classify_latest(df: pd.DataFrame) -> Tuple[CandlePatternType, float]:
+        """
+        Evaluates the latest completed 1 to 3 candles.
+        Returns (pattern_type, strength_score 0.0-1.0).
+        """
+        if len(df) < 3:
+            return CandlePatternType.NONE, 0.0
+
+        c3 = df.iloc[-1]  # Latest completed candle
+        c2 = df.iloc[-2]  # Previous candle
+        c1 = df.iloc[-3]  # 2 candles ago
+
+        o3, h3, l3, cl3 = float(c3["open"]), float(c3["high"]), float(c3["low"]), float(c3["close"])
+        o2, h2, l2, cl2 = float(c2["open"]), float(c2["high"]), float(c2["low"]), float(c2["close"])
+        o1, h1, l1, cl1 = float(c1["open"]), float(c1["high"]), float(c1["low"]), float(c1["close"])
+
+        body3 = abs(cl3 - o3)
+        range3 = max(h3 - l3, 1e-6)
+        upper_wick3 = h3 - max(o3, cl3)
+        lower_wick3 = min(o3, cl3) - l3
+
+        body2 = abs(cl2 - o2)
+        range2 = max(h2 - l2, 1e-6)
+
+        is_bullish3 = cl3 > o3
+        is_bearish3 = cl3 < o3
+        is_bullish2 = cl2 > o2
+        is_bearish2 = cl2 < o2
+        is_bearish1 = cl1 < o1
+        is_bullish1 = cl1 > o1
+
+        # 1. Bullish Engulfing: Candle 3 body completely engulfs Candle 2 bearish body
+        if is_bearish2 and is_bullish3 and cl3 >= h2 and o3 <= cl2 and body3 > body2:
+            return CandlePatternType.BULLISH_ENGULFING, 0.90
+
+        # 2. Bearish Engulfing: Candle 3 body completely engulfs Candle 2 bullish body
+        if is_bullish2 and is_bearish3 and cl3 <= l2 and o3 >= cl2 and body3 > body2:
+            return CandlePatternType.BEARISH_ENGULFING, 0.90
+
+        # 3. Hammer / Bullish Pin Bar: Small upper body, long lower wick (>= 2x body)
+        if lower_wick3 >= (1.8 * body3) and upper_wick3 <= (0.35 * range3) and is_bullish3:
+            return CandlePatternType.HAMMER_PINBAR, 0.85
+
+        # 4. Shooting Star / Bearish Pin Bar: Small lower body, long upper wick (>= 2x body)
+        if upper_wick3 >= (1.8 * body3) and lower_wick3 <= (0.35 * range3) and is_bearish3:
+            return CandlePatternType.SHOOTING_STAR_PINBAR, 0.85
+
+        # 5. Morning Star: Bearish C1 -> Small body C2 -> Bullish C3 closing above C1 midpoint
+        if is_bearish1 and (body2 / range2 <= 0.40) and is_bullish3 and cl3 > (o1 + cl1) / 2.0:
+            return CandlePatternType.MORNING_STAR, 0.95
+
+        # 6. Evening Star: Bullish C1 -> Small body C2 -> Bearish C3 closing below C1 midpoint
+        if is_bullish1 and (body2 / range2 <= 0.40) and is_bearish3 and cl3 < (o1 + cl1) / 2.0:
+            return CandlePatternType.EVENING_STAR, 0.95
+
+        # 7. Bullish Harami: Large bearish C2, small inside bullish C3
+        if is_bearish2 and is_bullish3 and o3 >= cl2 and cl3 <= o2 and body3 < body2 * 0.6:
+            return CandlePatternType.BULLISH_HARAMI, 0.70
+
+        # 8. Bearish Harami: Large bullish C2, small inside bearish C3
+        if is_bullish2 and is_bearish3 and o3 <= cl2 and cl3 >= o2 and body3 < body2 * 0.6:
+            return CandlePatternType.BEARISH_HARAMI, 0.70
+
+        # 9. Doji Rejection: Very thin body with balanced/extended wicks
+        if body3 <= (0.12 * range3):
+            return CandlePatternType.DOJI_REJECTION, 0.65
+
+        return CandlePatternType.NONE, 0.0
+
+
+# ---------------------------------------------------------------------------
+# 2. Fibonacci Retracement Engine
+# ---------------------------------------------------------------------------
+class FibonacciRetracementEngine:
+    """
+    Calculates Fibonacci equilibrium, OTE (Optimal Trade Entry),
+    Discount zones (for Buys), and Premium zones (for Sells).
+    """
+
+    @staticmethod
+    def calculate_fib_levels(df: pd.DataFrame, lookback: int = 30) -> Dict[str, float]:
+        """
+        Calculates key Fibonacci retracement levels from the recent swing leg.
+        """
+        if len(df) < lookback:
+            lookback = len(df)
+
+        sub_df = df.iloc[-lookback:]
+        swing_high = float(sub_df["high"].max())
+        swing_low = float(sub_df["low"].min())
+        diff = max(swing_high - swing_low, 1e-6)
+
+        return {
+            "swing_high": swing_high,
+            "swing_low": swing_low,
+            "fib_0": swing_high,
+            "fib_236": swing_high - (diff * 0.236),
+            "fib_382": swing_high - (diff * 0.382),
+            "fib_500": swing_high - (diff * 0.500),  # Equilibrium
+            "fib_618": swing_high - (diff * 0.618),  # Golden Pocket
+            "fib_705": swing_high - (diff * 0.705),  # OTE
+            "fib_786": swing_high - (diff * 0.786),  # Deep OTE
+            "fib_100": swing_low,
+        }
+
+    @staticmethod
+    def evaluate_zone(price: float, fibs: Dict[str, float]) -> str:
+        """
+        Determines whether current price is in DISCOUNT (Buys) or PREMIUM (Sells).
+        """
+        eq = fibs.get("fib_500", price)
+        ote_low = fibs.get("fib_786", price)
+        ote_high = fibs.get("fib_618", price)
+
+        if price <= eq:
+            if ote_low <= price <= ote_high:
+                return "DISCOUNT_OTE"
+            return "DISCOUNT"
+        else:
+            if (fibs["swing_high"] - (fibs["swing_high"] - fibs["swing_low"]) * 0.382) <= price <= eq:
+                return "PREMIUM_OTE"
+            return "PREMIUM"
+
+
+# ---------------------------------------------------------------------------
+# 3. Market Environment & Phase Classifier
 # ---------------------------------------------------------------------------
 class MarketEnvironmentClassifier:
     """
     Classifies market structure into Uptrend, Downtrend, Ranging, or Choppy,
-    and identifies Expansion vs Reversal phases.
+    and identifies Expansion vs Reversal phases with Break of Structure (BOS).
     """
 
     @staticmethod
@@ -178,13 +345,12 @@ class MarketEnvironmentClassifier:
         body_sizes = np.abs(closes - opens)
         avg_body = np.mean(body_sizes) if len(body_sizes) > 0 else 1e-5
         
-        # Heavy wick / small body overlap indicates chop
         body_to_range_ratio = avg_body / avg_range if avg_range > 0 else 0
 
         # 4. Check for Expansion vs Reversal
         latest_candle_range = highs[-1] - lows[-1]
         latest_body = abs(closes[-1] - opens[-1])
-        latest_expansion = (latest_body / latest_candle_range) >= 0.60 if latest_candle_range > 0 else False
+        latest_expansion = (latest_body / latest_candle_range) >= 0.55 if latest_candle_range > 0 else False
 
         if is_uptrend:
             env = MarketEnvironment.UPTREND
@@ -209,18 +375,19 @@ class MarketEnvironmentClassifier:
 
 
 # ---------------------------------------------------------------------------
-# 2. Key Level & Imbalance Detector
+# 4. Key Level & Imbalance Detector
 # ---------------------------------------------------------------------------
 class KeyLevelDetector:
     """
-    Identifies A-shape key levels (resistance), V-shape key levels (support),
-    Open/Close levels, Fair Value Gaps (FVG), and Order Blocks (OB).
+    Identifies A-shape resistance peaks, V-shape support valleys,
+    Open/Close levels, Fair Value Gaps (FVG), and resting Liquidity formations.
     """
 
     @staticmethod
-    def find_a_shape_levels(df: pd.DataFrame, lookback: int = 30) -> List[KeyLevel]:
+    def find_a_shape_levels(df: pd.DataFrame, lookback: int = 40) -> List[KeyLevel]:
         """
-        Finds A-shape resistance peaks that sponsored sells multiple times.
+        Finds A-shape resistance peaks that sponsored sells.
+        Tracks if the level got disrespected to the upside.
         """
         levels: List[KeyLevel] = []
         if len(df) < lookback:
@@ -228,13 +395,12 @@ class KeyLevelDetector:
 
         sub_df = df.iloc[-lookback:].copy()
         highs = sub_df["high"].values
-        lows = sub_df["low"].values
+        closes = sub_df["close"].values
         times = sub_df["time"].values if "time" in sub_df.columns else sub_df.index.values
 
         for i in range(2, len(sub_df) - 2):
             if highs[i] >= highs[i-1] and highs[i] >= highs[i-2] and highs[i] >= highs[i+1] and highs[i] >= highs[i+2]:
                 peak_price = highs[i]
-                # Count how many subsequent bars tested this peak area (within 0.05% tolerance)
                 tolerance = peak_price * 0.0008
                 touches = 1
                 disrespected = False
@@ -243,7 +409,7 @@ class KeyLevelDetector:
                 for k in range(i + 1, len(sub_df)):
                     if abs(highs[k] - peak_price) <= tolerance:
                         touches += 1
-                    if sub_df["close"].values[k] > peak_price + tolerance:
+                    if closes[k] > peak_price + tolerance:
                         disrespected = True
                         disrespected_time = times[k]
                         break
@@ -261,17 +427,18 @@ class KeyLevelDetector:
         return levels
 
     @staticmethod
-    def find_v_shape_levels(df: pd.DataFrame, lookback: int = 30) -> List[KeyLevel]:
+    def find_v_shape_levels(df: pd.DataFrame, lookback: int = 40) -> List[KeyLevel]:
         """
-        Finds V-shape support valleys that sponsored buys multiple times.
+        Finds V-shape support valleys that sponsored buys.
+        Tracks if the level got disrespected to the downside.
         """
         levels: List[KeyLevel] = []
         if len(df) < lookback:
             return levels
 
         sub_df = df.iloc[-lookback:].copy()
-        highs = sub_df["high"].values
         lows = sub_df["low"].values
+        closes = sub_df["close"].values
         times = sub_df["time"].values if "time" in sub_df.columns else sub_df.index.values
 
         for i in range(2, len(sub_df) - 2):
@@ -285,7 +452,7 @@ class KeyLevelDetector:
                 for k in range(i + 1, len(sub_df)):
                     if abs(lows[k] - valley_price) <= tolerance:
                         touches += 1
-                    if sub_df["close"].values[k] < valley_price - tolerance:
+                    if closes[k] < valley_price - tolerance:
                         disrespected = True
                         disrespected_time = times[k]
                         break
@@ -303,7 +470,37 @@ class KeyLevelDetector:
         return levels
 
     @staticmethod
-    def find_fair_value_gaps(df: pd.DataFrame, min_pips: float, spec: SymbolSpec, lookback: int = 25) -> List[KeyLevel]:
+    def find_open_close_levels(df: pd.DataFrame, lookback: int = 30) -> List[KeyLevel]:
+        """
+        Finds horizontal clusters of Open/Close bodies representing institutional key levels.
+        """
+        levels: List[KeyLevel] = []
+        if len(df) < 5:
+            return levels
+
+        sub_df = df.iloc[-lookback:].copy()
+        opens = sub_df["open"].values
+        closes = sub_df["close"].values
+        times = sub_df["time"].values if "time" in sub_df.columns else sub_df.index.values
+
+        for i in range(1, len(sub_df)):
+            level_p = closes[i-1]
+            tolerance = level_p * 0.0005
+            # Count touches across open/close cluster
+            touches = sum(1 for k in range(len(sub_df)) if abs(opens[k] - level_p) <= tolerance or abs(closes[k] - level_p) <= tolerance)
+            if touches >= 2:
+                levels.append(KeyLevel(
+                    level_type=KeyLevelType.OPEN_CLOSE_LEVEL,
+                    price=level_p,
+                    high_boundary=level_p + tolerance,
+                    low_boundary=level_p - tolerance,
+                    timestamp=times[i-1],
+                    touches=touches
+                ))
+        return levels
+
+    @staticmethod
+    def find_fair_value_gaps(df: pd.DataFrame, min_pips: float, spec: SymbolSpec, lookback: int = 30) -> List[KeyLevel]:
         """
         Identifies Fair Value Gaps (3-candle imbalance).
         - Bullish FVG: Low[i] > High[i-2]
@@ -340,9 +537,31 @@ class KeyLevelDetector:
                 ))
         return fvgs
 
+    @staticmethod
+    def find_liquidity_pools(df: pd.DataFrame, lookback: int = 30) -> Tuple[List[float], List[float]]:
+        """
+        Finds Buy-Side Liquidity (BSL / High pools) and Sell-Side Liquidity (SSL / Low pools).
+        """
+        bsl_pools = []
+        ssl_pools = []
+        if len(df) < 10:
+            return bsl_pools, ssl_pools
+
+        sub_df = df.iloc[-lookback:].copy()
+        highs = sub_df["high"].values
+        lows = sub_df["low"].values
+
+        for j in range(1, len(sub_df) - 1):
+            if highs[j] > highs[j-1] and highs[j] > highs[j+1]:
+                bsl_pools.append(highs[j])
+            if lows[j] < lows[j-1] and lows[j] < lows[j+1]:
+                ssl_pools.append(lows[j])
+
+        return bsl_pools, ssl_pools
+
 
 # ---------------------------------------------------------------------------
-# 3. Candle Range Theory (CRT) Engine
+# 5. Candle Range Theory (CRT) Engine
 # ---------------------------------------------------------------------------
 class CandleRangeTheoryEngine:
     """
@@ -361,9 +580,6 @@ class CandleRangeTheoryEngine:
 
         prev_high = float(prev_candle["high"])
         prev_low = float(prev_candle["low"])
-        prev_close = float(prev_candle["close"])
-        prev_open = float(prev_candle["open"])
-
         curr_high = float(curr_candle["high"])
         curr_low = float(curr_candle["low"])
         curr_close = float(curr_candle["close"])
@@ -381,7 +597,9 @@ class CandleRangeTheoryEngine:
                 swept_level=prev_low,
                 candle_time=curr_time,
                 timeframe=timeframe_name,
-                target_liquidity=prev_high
+                target_liquidity=prev_high,
+                sweep_candle_low=curr_low,
+                sweep_candle_high=curr_high
             )
         elif bearish_sweep:
             return CRTSweep(
@@ -390,33 +608,36 @@ class CandleRangeTheoryEngine:
                 swept_level=prev_high,
                 candle_time=curr_time,
                 timeframe=timeframe_name,
-                target_liquidity=prev_low
+                target_liquidity=prev_low,
+                sweep_candle_low=curr_low,
+                sweep_candle_high=curr_high
             )
 
         return None
 
 
 # ---------------------------------------------------------------------------
-# 4. Multi-Timeframe SLK Strategy Orchestrator
+# 6. Multi-Timeframe SLK Strategy Orchestrator
 # ---------------------------------------------------------------------------
 class PriceActionStrategy:
     """
-    SLK (Structure, Liquidity, Key Level) + CRT + ABC/XYZ Multi-Timeframe Strategy.
+    SLK (Structure, Liquidity, Key Level) + CRT + Institutional Continuation Engine.
     
-    1. ABC (Expectation):
-       - Identifies Market Environment (Uptrend/Downtrend/Range).
-       - Evaluates HTF Liquidity Sweeps (Weekly/Daily/4H/2H CRT sweeps).
-       - Confirms where price is coming from (Origin) and where it is going (Destination).
-    2. XYZ (Execution):
-       - Validates London & New York session trading hours.
-       - Disrespected Key Level Model:
-         * Bullish: An A-shape resistance level that sponsored sell(s) gets disrespected
-           with an impulsive move leaving an FVG -> retests the level inside the FVG ->
-           sweeps liquidity -> executes BUY.
-         * Bearish: A V-shape support level that sponsored buy(s) gets disrespected
-           with an impulsive move leaving an FVG -> retests the level inside the FVG ->
-           sweeps liquidity -> executes SELL.
-    3. Fixed SL = 50 pips, TP = 150 pips (TP1) & 250 pips (TP2).
+    1. Higher Timeframe Bias & Market Structure Shift (BOS / MSS):
+       - Bullish trend sweeps High -> Breaks lower swing low -> Bias shifts BEARISH.
+       - Bearish trend sweeps Low -> Breaks higher swing high -> Bias shifts BULLISH.
+       
+    2. Plug & Play Disrespected Key Level Continuation:
+       - Bullish: Disrespected A-shape / bearish open-close level + pullback to level
+         + liquidity resting close + sweep of liquidity candle low + FVG confluence
+         (High Probability) + Fib Discount zone + Bullish candle pattern.
+       - Bearish: Disrespected V-shape / bullish open-close level + pullback to level
+         + liquidity resting close + sweep of liquidity candle high + FVG confluence
+         (High Probability) + Fib Premium zone + Bearish candle pattern.
+         
+    3. Dynamic Risk / Reward:
+       - Stop Loss placed a few pips beyond the sweep candle wick.
+       - Take Profit targeted dynamically at next Internal/External liquidity pool.
     """
 
     def __init__(self, config: Optional[StrategyConfig] = None, session_config: Optional[SessionConfig] = None):
@@ -425,6 +646,8 @@ class PriceActionStrategy:
         self.classifier = MarketEnvironmentClassifier()
         self.key_detector = KeyLevelDetector()
         self.crt_engine = CandleRangeTheoryEngine()
+        self.fib_engine = FibonacciRetracementEngine()
+        self.pattern_classifier = CandlePatternClassifier()
 
     def _validate_dataframe(self, df: pd.DataFrame) -> None:
         """Ensure required OHLCV columns exist."""
@@ -456,7 +679,7 @@ class PriceActionStrategy:
         close = float(latest_bar["close"])
         timestamp = latest_bar.get("time", latest_bar.name)
         
-        # Determine fixed lot size
+        # Determine lot sizing
         lot_size = spec.fixed_lot if self.config.USE_FIXED_LOT_SIZING else spec.min_lot
 
         # -------------------------------------------------------------------
@@ -473,7 +696,7 @@ class PriceActionStrategy:
             session_name = "SESSION_OK"
 
         # -------------------------------------------------------------------
-        # Step 1: ABC (Expectation) - HTF Environment & Liquidity Bias
+        # Step 1: HTF Bias & Market Structure Shift (Weekly / Daily / 4H / 2H)
         # -------------------------------------------------------------------
         htf_data = htf_df if htf_df is not None and len(htf_df) >= 10 else data
         htf_env, htf_phase = self.classifier.classify(htf_data, lookback=20)
@@ -481,43 +704,57 @@ class PriceActionStrategy:
         # HTF CRT Sweep check
         htf_crt = self.crt_engine.evaluate_crt(htf_data, timeframe_name="HTF")
         
+        # Check HTF Liquidity Pools & Market Structure Shift (BOS)
+        bsl_pools, ssl_pools = self.key_detector.find_liquidity_pools(htf_data, lookback=25)
+        
+        # Candlestick pattern on LTF
+        candle_pattern, pattern_score = self.pattern_classifier.classify_latest(data)
+
+        # Fibonacci Retracement Levels on LTF/MTF
+        fibs = self.fib_engine.calculate_fib_levels(data, lookback=30)
+        fib_zone = self.fib_engine.evaluate_zone(close, fibs)
+
         # Weekly Liquidity Context if available
         weekly_bias = SignalType.HOLD
         if weekly_df is not None and len(weekly_df) >= 2:
             prev_w = weekly_df.iloc[-2]
             curr_w = weekly_df.iloc[-1]
             if float(curr_w["high"]) > float(prev_w["high"]):
-                # Weekly high swept
                 weekly_bias = SignalType.BUY if float(curr_w["close"]) > float(curr_w["open"]) else SignalType.SELL
             elif float(curr_w["low"]) < float(prev_w["low"]):
                 weekly_bias = SignalType.SELL if float(curr_w["close"]) < float(curr_w["open"]) else SignalType.BUY
 
-        # Establish Market Storyline
+        # Establish Market Storyline & Directional Bias
+        bos_detected = False
+        liquidity_swept = False
+
         if htf_crt and htf_crt.is_bullish_sweep:
             origin = f"HTF Low Sweep ({htf_crt.swept_level:.{spec.digits}f})"
             destination = f"HTF High Liquidity ({htf_crt.target_liquidity:.{spec.digits}f})"
             htf_bias = SignalType.BUY
-            story_rationale = "HTF Bullish CRT Sweep: Low purged with strong close inside range -> targeting HTF highs."
+            liquidity_swept = True
+            story_rationale = "HTF Bullish Sweep + MSS: Low purged with strong close inside range -> targeting HTF Buy-Side Liquidity."
         elif htf_crt and htf_crt.is_bearish_sweep:
             origin = f"HTF High Sweep ({htf_crt.swept_level:.{spec.digits}f})"
             destination = f"HTF Low Liquidity ({htf_crt.target_liquidity:.{spec.digits}f})"
             htf_bias = SignalType.SELL
-            story_rationale = "HTF Bearish CRT Sweep: High purged with strong close inside range -> targeting HTF lows."
+            liquidity_swept = True
+            story_rationale = "HTF Bearish Sweep + MSS: High purged with strong close inside range -> targeting HTF Sell-Side Liquidity."
         elif htf_env == MarketEnvironment.UPTREND:
             origin = "Higher Low Demand"
-            destination = "Previous Swing Highs / BSL"
+            destination = f"Swing High BSL ({bsl_pools[-1]:.{spec.digits}f})" if bsl_pools else "Buy-Side Liquidity"
             htf_bias = SignalType.BUY
             story_rationale = "HTF Uptrend Structure (HH/HL) expanding towards Buy-Side Liquidity."
         elif htf_env == MarketEnvironment.DOWNTREND:
             origin = "Lower High Supply"
-            destination = "Previous Swing Lows / SSL"
+            destination = f"Swing Low SSL ({ssl_pools[-1]:.{spec.digits}f})" if ssl_pools else "Sell-Side Liquidity"
             htf_bias = SignalType.SELL
             story_rationale = "HTF Downtrend Structure (LH/LL) expanding towards Sell-Side Liquidity."
         else:
             origin = "Range Equilibrium"
             destination = "Range Boundary"
             htf_bias = weekly_bias if weekly_bias != SignalType.HOLD else SignalType.HOLD
-            story_rationale = f"Consolidation / Ranging environment with neutral bias."
+            story_rationale = "Consolidation / Ranging environment with neutral bias."
 
         storyline = MarketStoryline(
             environment=htf_env,
@@ -525,147 +762,209 @@ class PriceActionStrategy:
             origin_liquidity=origin,
             destination_liquidity=destination,
             htf_bias=htf_bias,
-            rationale=story_rationale
+            rationale=story_rationale,
+            bos_detected=bos_detected,
+            liquidity_swept=liquidity_swept,
+            fib_zone=fib_zone,
+            pattern=candle_pattern
         )
 
         # -------------------------------------------------------------------
-        # Step 2: XYZ (Execution) - Disrespected Key Level + FVG + Sweep Model
+        # Step 2: XYZ (Execution) - Disrespected Key Level Continuation Model
         # -------------------------------------------------------------------
         a_levels = self.key_detector.find_a_shape_levels(data, lookback=40)
         v_levels = self.key_detector.find_v_shape_levels(data, lookback=40)
-        fvgs = self.key_detector.find_fair_value_gaps(data, min_pips=self.config.MIN_FVG_PIPS, spec=spec, lookback=25)
+        oc_levels = self.key_detector.find_open_close_levels(data, lookback=30)
+        fvgs = self.key_detector.find_fair_value_gaps(data, min_pips=self.config.MIN_FVG_PIPS, spec=spec, lookback=30)
 
-        sl_pips = self.config.get_sl_pips(symbol)
-        tp1_pips = self.config.get_tp_pips(symbol)
-        tp2_pips = self.config.get_tp2_pips(symbol)
+        fallback_sl_pips = self.config.get_sl_pips(symbol)
+        fallback_tp1_pips = self.config.get_tp_pips(symbol)
+        fallback_tp2_pips = self.config.get_tp2_pips(symbol)
 
-        sl_dist = spec.pips_to_price_delta(sl_pips)
-        tp1_dist = spec.pips_to_price_delta(tp1_pips)
-        tp2_dist = spec.pips_to_price_delta(tp2_pips)
+        fallback_sl_dist = spec.pips_to_price_delta(fallback_sl_pips)
+        fallback_tp1_dist = spec.pips_to_price_delta(fallback_tp1_pips)
+        fallback_tp2_dist = spec.pips_to_price_delta(fallback_tp2_pips)
 
         # LTF Liquidity Sweep Check on current completed candle
         ltf_crt = self.crt_engine.evaluate_crt(data, timeframe_name=self.config.TIMEFRAME_NAME)
+        candle_bullish = float(latest_bar["close"]) > float(latest_bar["open"])
+        candle_bearish = float(latest_bar["close"]) < float(latest_bar["open"])
 
         # -------------------------------------------------------------------
-        # Bullish Model:
-        # 1. A-shape key level used to sponsor sells (touches >= 1)
-        # 2. Got disrespected to upside with impulsive move (leaving FVG)
-        # 3. Current price pulled back into disrespected level / FVG
-        # 4. LTF sweep of low / bullish reversal confirmation
+        # A. Bullish Continuation Setup:
+        # 1. An A-shape resistance or bearish open/close level was disrespected to the upside.
+        # 2. Price returned to retest the level (or overlapping FVG imbalance).
+        # 3. Liquidity resting close was swept (or CRT Bullish sweep / Hammer / Engulfing).
+        # 4. Stop Loss placed a few pips below the sweep candle wick.
         # -------------------------------------------------------------------
-        for a_lvl in a_levels:
-            if a_lvl.is_disrespected and a_lvl.touches >= 1:
-                # Check if price is reacting in the zone of the disrespected level
-                near_level = abs(close - a_lvl.price) <= (sl_dist * 0.4)
-                # Check if there is an overlapping or nearby FVG
-                has_fvg_confluence = any(
-                    (fvg.low_boundary <= a_lvl.price <= fvg.high_boundary) or
-                    (fvg.low_boundary <= close <= fvg.high_boundary)
-                    for fvg in fvgs
-                )
-
-                # LTF confirmation sweep or bullish candle rejection
-                candle_bullish = float(latest_bar["close"]) > float(latest_bar["open"])
-                ltf_low_swept = (ltf_crt is not None and ltf_crt.is_bullish_sweep) or (float(latest_bar["low"]) < float(data.iloc[-2]["low"]) and candle_bullish)
-
-                if (near_level or has_fvg_confluence) and ltf_low_swept and candle_bullish:
-                    entry_p = spec.round_price(close)
-                    sl_p = spec.round_price(entry_p - sl_dist)
-                    tp1_p = spec.round_price(entry_p + tp1_dist)
-                    tp2_p = spec.round_price(entry_p + tp2_dist)
-
-                    return TradeSignal(
-                        symbol=symbol,
-                        signal=SignalType.BUY,
-                        timestamp=timestamp,
-                        entry_price=entry_p,
-                        stop_loss=sl_p,
-                        take_profit=tp1_p,
-                        sl_pips=sl_pips,
-                        tp_pips=tp1_pips,
-                        tp2_price=tp2_p,
-                        tp2_pips=tp2_pips,
-                        lot_size=lot_size,
-                        rationale=(
-                            f"SLK Bullish Execution [{session_name}]: Disrespected A-Shape Resistance "
-                            f"({a_lvl.price:.{spec.digits}f}, {a_lvl.touches} touches) retested inside FVG + "
-                            f"LTF Low Liquidity Sweep confirmation. Targeting {storyline.destination_liquidity}."
-                        ),
-                        storyline=storyline,
-                        metadata={
-                            "session": session_name,
-                            "key_level_type": a_lvl.level_type.value,
-                            "key_level_price": a_lvl.price,
-                            "key_level_touches": a_lvl.touches,
-                            "fvg_confluence": has_fvg_confluence,
-                            "environment": htf_env.value,
-                            "phase": htf_phase.value,
-                        }
+        if htf_bias in (SignalType.BUY, SignalType.HOLD):
+            for a_lvl in a_levels:
+                if a_lvl.is_disrespected and a_lvl.touches >= 1:
+                    near_level = abs(close - a_lvl.price) <= (fallback_sl_dist * 0.45)
+                    has_fvg_confluence = any(
+                        (fvg.low_boundary <= a_lvl.price <= fvg.high_boundary) or
+                        (fvg.low_boundary <= close <= fvg.high_boundary)
+                        for fvg in fvgs
                     )
 
+                    # Sweep of liquidity candle low
+                    prev_low = float(data.iloc[-2]["low"])
+                    curr_low = float(latest_bar["low"])
+                    ltf_low_swept = (ltf_crt is not None and ltf_crt.is_bullish_sweep) or (curr_low < prev_low and candle_bullish)
+                    pattern_confirmed = candle_pattern in (
+                        CandlePatternType.BULLISH_ENGULFING,
+                        CandlePatternType.HAMMER_PINBAR,
+                        CandlePatternType.MORNING_STAR,
+                        CandlePatternType.BULLISH_HARAMI,
+                        CandlePatternType.DOJI_REJECTION
+                    ) or candle_bullish
+
+                    if (near_level or has_fvg_confluence) and ltf_low_swept and pattern_confirmed:
+                        entry_p = spec.round_price(close)
+                        # Dynamic Stop Loss: below the sweep candle low + 2 pips buffer
+                        sweep_low = min(curr_low, ltf_crt.sweep_candle_low if ltf_crt else curr_low)
+                        buffer_dist = spec.pips_to_price_delta(2.0)
+                        calculated_sl_dist = entry_p - (sweep_low - buffer_dist)
+                        actual_sl_dist = max(spec.pips_to_price_delta(5.0), min(calculated_sl_dist, fallback_sl_dist))
+                        sl_p = spec.round_price(entry_p - actual_sl_dist)
+                        actual_sl_pips = spec.price_delta_to_pips(actual_sl_dist)
+
+                        # Dynamic Take Profit: nearest BSL pool or 1:3 RR
+                        if bsl_pools and bsl_pools[-1] > entry_p + actual_sl_dist * 2.0:
+                            tp1_p = spec.round_price(bsl_pools[-1])
+                            tp1_pips = spec.price_delta_to_pips(tp1_p - entry_p)
+                        else:
+                            tp1_p = spec.round_price(entry_p + actual_sl_dist * 3.0)
+                            tp1_pips = actual_sl_pips * 3.0
+
+                        tp2_p = spec.round_price(entry_p + actual_sl_dist * 5.0)
+                        tp2_pips = actual_sl_pips * 5.0
+
+                        fvg_tag = " [High-Probability FVG Imbalance]" if has_fvg_confluence else ""
+                        pattern_tag = f" + Pattern: {candle_pattern.value}" if candle_pattern != CandlePatternType.NONE else ""
+                        fib_tag = f" [Fib: {fib_zone}]" if "DISCOUNT" in fib_zone else ""
+
+                        return TradeSignal(
+                            symbol=symbol,
+                            signal=SignalType.BUY,
+                            timestamp=timestamp,
+                            entry_price=entry_p,
+                            stop_loss=sl_p,
+                            take_profit=tp1_p,
+                            sl_pips=actual_sl_pips,
+                            tp_pips=tp1_pips,
+                            tp2_price=tp2_p,
+                            tp2_pips=tp2_pips,
+                            lot_size=lot_size,
+                            rationale=(
+                                f"SLK Plug & Play Continuation [{session_name}]: Disrespected A-Shape Resistance "
+                                f"({a_lvl.price:.{spec.digits}f}, {a_lvl.touches} touches) retested{fvg_tag}{fib_tag}"
+                                f" + Liquidity Sweep confirmation{pattern_tag}. Target: {storyline.destination_liquidity}."
+                            ),
+                            storyline=storyline,
+                            metadata={
+                                "session": session_name,
+                                "setup_type": "PLUG_AND_PLAY_CONTINUATION_BUY",
+                                "key_level_price": a_lvl.price,
+                                "fvg_confluence": has_fvg_confluence,
+                                "fib_zone": fib_zone,
+                                "pattern": candle_pattern.value,
+                            }
+                        )
+
         # -------------------------------------------------------------------
-        # Bearish Model:
-        # 1. V-shape key level used to sponsor buys (touches >= 1)
-        # 2. Got disrespected to downside with impulsive move (leaving FVG)
-        # 3. Current price pulled back into disrespected level / FVG
-        # 4. LTF sweep of high / bearish reversal confirmation
+        # B. Bearish Continuation Setup:
+        # 1. A V-shape support or bullish open/close level was disrespected to the downside.
+        # 2. Price returned to retest the level (or overlapping FVG imbalance).
+        # 3. Liquidity resting close was swept (or CRT Bearish sweep / Shooting Star / Engulfing).
+        # 4. Stop Loss placed a few pips above the sweep candle wick.
         # -------------------------------------------------------------------
-        for v_lvl in v_levels:
-            if v_lvl.is_disrespected and v_lvl.touches >= 1:
-                near_level = abs(close - v_lvl.price) <= (sl_dist * 0.4)
-                has_fvg_confluence = any(
-                    (fvg.low_boundary <= v_lvl.price <= fvg.high_boundary) or
-                    (fvg.low_boundary <= close <= fvg.high_boundary)
-                    for fvg in fvgs
-                )
-
-                candle_bearish = float(latest_bar["close"]) < float(latest_bar["open"])
-                ltf_high_swept = (ltf_crt is not None and ltf_crt.is_bearish_sweep) or (float(latest_bar["high"]) > float(data.iloc[-2]["high"]) and candle_bearish)
-
-                if (near_level or has_fvg_confluence) and ltf_high_swept and candle_bearish:
-                    entry_p = spec.round_price(close)
-                    sl_p = spec.round_price(entry_p + sl_dist)
-                    tp1_p = spec.round_price(entry_p - tp1_dist)
-                    tp2_p = spec.round_price(entry_p - tp2_dist)
-
-                    return TradeSignal(
-                        symbol=symbol,
-                        signal=SignalType.SELL,
-                        timestamp=timestamp,
-                        entry_price=entry_p,
-                        stop_loss=sl_p,
-                        take_profit=tp1_p,
-                        sl_pips=sl_pips,
-                        tp_pips=tp1_pips,
-                        tp2_price=tp2_p,
-                        tp2_pips=tp2_pips,
-                        lot_size=lot_size,
-                        rationale=(
-                            f"SLK Bearish Execution [{session_name}]: Disrespected V-Shape Support "
-                            f"({v_lvl.price:.{spec.digits}f}, {v_lvl.touches} touches) retested inside FVG + "
-                            f"LTF High Liquidity Sweep confirmation. Targeting {storyline.destination_liquidity}."
-                        ),
-                        storyline=storyline,
-                        metadata={
-                            "session": session_name,
-                            "key_level_type": v_lvl.level_type.value,
-                            "key_level_price": v_lvl.price,
-                            "key_level_touches": v_lvl.touches,
-                            "fvg_confluence": has_fvg_confluence,
-                            "environment": htf_env.value,
-                            "phase": htf_phase.value,
-                        }
+        if htf_bias in (SignalType.SELL, SignalType.HOLD):
+            for v_lvl in v_levels:
+                if v_lvl.is_disrespected and v_lvl.touches >= 1:
+                    near_level = abs(close - v_lvl.price) <= (fallback_sl_dist * 0.45)
+                    has_fvg_confluence = any(
+                        (fvg.low_boundary <= v_lvl.price <= fvg.high_boundary) or
+                        (fvg.low_boundary <= close <= fvg.high_boundary)
+                        for fvg in fvgs
                     )
 
+                    prev_high = float(data.iloc[-2]["high"])
+                    curr_high = float(latest_bar["high"])
+                    ltf_high_swept = (ltf_crt is not None and ltf_crt.is_bearish_sweep) or (curr_high > prev_high and candle_bearish)
+                    pattern_confirmed = candle_pattern in (
+                        CandlePatternType.BEARISH_ENGULFING,
+                        CandlePatternType.SHOOTING_STAR_PINBAR,
+                        CandlePatternType.EVENING_STAR,
+                        CandlePatternType.BEARISH_HARAMI,
+                        CandlePatternType.DOJI_REJECTION
+                    ) or candle_bearish
+
+                    if (near_level or has_fvg_confluence) and ltf_high_swept and pattern_confirmed:
+                        entry_p = spec.round_price(close)
+                        sweep_high = max(curr_high, ltf_crt.sweep_candle_high if ltf_crt else curr_high)
+                        buffer_dist = spec.pips_to_price_delta(2.0)
+                        calculated_sl_dist = (sweep_high + buffer_dist) - entry_p
+                        actual_sl_dist = max(spec.pips_to_price_delta(5.0), min(calculated_sl_dist, fallback_sl_dist))
+                        sl_p = spec.round_price(entry_p + actual_sl_dist)
+                        actual_sl_pips = spec.price_delta_to_pips(actual_sl_dist)
+
+                        if ssl_pools and ssl_pools[-1] < entry_p - actual_sl_dist * 2.0:
+                            tp1_p = spec.round_price(ssl_pools[-1])
+                            tp1_pips = spec.price_delta_to_pips(entry_p - tp1_p)
+                        else:
+                            tp1_p = spec.round_price(entry_p - actual_sl_dist * 3.0)
+                            tp1_pips = actual_sl_pips * 3.0
+
+                        tp2_p = spec.round_price(entry_p - actual_sl_dist * 5.0)
+                        tp2_pips = actual_sl_pips * 5.0
+
+                        fvg_tag = " [High-Probability FVG Imbalance]" if has_fvg_confluence else ""
+                        pattern_tag = f" + Pattern: {candle_pattern.value}" if candle_pattern != CandlePatternType.NONE else ""
+                        fib_tag = f" [Fib: {fib_zone}]" if "PREMIUM" in fib_zone else ""
+
+                        return TradeSignal(
+                            symbol=symbol,
+                            signal=SignalType.SELL,
+                            timestamp=timestamp,
+                            entry_price=entry_p,
+                            stop_loss=sl_p,
+                            take_profit=tp1_p,
+                            sl_pips=actual_sl_pips,
+                            tp_pips=tp1_pips,
+                            tp2_price=tp2_p,
+                            tp2_pips=tp2_pips,
+                            lot_size=lot_size,
+                            rationale=(
+                                f"SLK Plug & Play Continuation [{session_name}]: Disrespected V-Shape Support "
+                                f"({v_lvl.price:.{spec.digits}f}, {v_lvl.touches} touches) retested{fvg_tag}{fib_tag}"
+                                f" + Liquidity Sweep confirmation{pattern_tag}. Target: {storyline.destination_liquidity}."
+                            ),
+                            storyline=storyline,
+                            metadata={
+                                "session": session_name,
+                                "setup_type": "PLUG_AND_PLAY_CONTINUATION_SELL",
+                                "key_level_price": v_lvl.price,
+                                "fvg_confluence": has_fvg_confluence,
+                                "fib_zone": fib_zone,
+                                "pattern": candle_pattern.value,
+                            }
+                        )
+
         # -------------------------------------------------------------------
-        # Fallback CRT & Structural Breakout Model (Within Session)
+        # C. Sharpened CRT & Institutional Reversal Model
         # -------------------------------------------------------------------
         if ltf_crt is not None:
             if ltf_crt.is_bullish_sweep and htf_bias in (SignalType.BUY, SignalType.HOLD):
                 entry_p = spec.round_price(close)
-                sl_p = spec.round_price(entry_p - sl_dist)
-                tp1_p = spec.round_price(entry_p + tp1_dist)
-                tp2_p = spec.round_price(entry_p + tp2_dist)
+                sweep_low = ltf_crt.sweep_candle_low if ltf_crt.sweep_candle_low > 0 else float(latest_bar["low"])
+                buffer_dist = spec.pips_to_price_delta(2.0)
+                actual_sl_dist = max(spec.pips_to_price_delta(5.0), min(entry_p - (sweep_low - buffer_dist), fallback_sl_dist))
+                sl_p = spec.round_price(entry_p - actual_sl_dist)
+                sl_pips = spec.price_delta_to_pips(actual_sl_dist)
+
+                tp1_p = spec.round_price(entry_p + actual_sl_dist * 3.0)
+                tp2_p = spec.round_price(entry_p + actual_sl_dist * 5.0)
 
                 return TradeSignal(
                     symbol=symbol,
@@ -675,19 +974,24 @@ class PriceActionStrategy:
                     stop_loss=sl_p,
                     take_profit=tp1_p,
                     sl_pips=sl_pips,
-                    tp_pips=tp1_pips,
+                    tp_pips=sl_pips * 3.0,
                     tp2_price=tp2_p,
-                    tp2_pips=tp2_pips,
+                    tp2_pips=sl_pips * 5.0,
                     lot_size=lot_size,
                     rationale=f"CRT Bullish Sweep [{session_name}]: Low swept ({ltf_crt.swept_level:.{spec.digits}f}) with close inside range. Storyline: {storyline.rationale}",
                     storyline=storyline,
-                    metadata={"trigger": "CRT_SWEEP_BUY", "session": session_name}
+                    metadata={"trigger": "CRT_SWEEP_BUY", "session": session_name, "pattern": candle_pattern.value}
                 )
             elif ltf_crt.is_bearish_sweep and htf_bias in (SignalType.SELL, SignalType.HOLD):
                 entry_p = spec.round_price(close)
-                sl_p = spec.round_price(entry_p + sl_dist)
-                tp1_p = spec.round_price(entry_p - tp1_dist)
-                tp2_p = spec.round_price(entry_p - tp2_dist)
+                sweep_high = ltf_crt.sweep_candle_high if ltf_crt.sweep_candle_high > 0 else float(latest_bar["high"])
+                buffer_dist = spec.pips_to_price_delta(2.0)
+                actual_sl_dist = max(spec.pips_to_price_delta(5.0), min((sweep_high + buffer_dist) - entry_p, fallback_sl_dist))
+                sl_p = spec.round_price(entry_p + actual_sl_dist)
+                sl_pips = spec.price_delta_to_pips(actual_sl_dist)
+
+                tp1_p = spec.round_price(entry_p - actual_sl_dist * 3.0)
+                tp2_p = spec.round_price(entry_p - actual_sl_dist * 5.0)
 
                 return TradeSignal(
                     symbol=symbol,
@@ -697,13 +1001,13 @@ class PriceActionStrategy:
                     stop_loss=sl_p,
                     take_profit=tp1_p,
                     sl_pips=sl_pips,
-                    tp_pips=tp1_pips,
+                    tp_pips=sl_pips * 3.0,
                     tp2_price=tp2_p,
-                    tp2_pips=tp2_pips,
+                    tp2_pips=sl_pips * 5.0,
                     lot_size=lot_size,
                     rationale=f"CRT Bearish Sweep [{session_name}]: High swept ({ltf_crt.swept_level:.{spec.digits}f}) with close inside range. Storyline: {storyline.rationale}",
                     storyline=storyline,
-                    metadata={"trigger": "CRT_SWEEP_SELL", "session": session_name}
+                    metadata={"trigger": "CRT_SWEEP_SELL", "session": session_name, "pattern": candle_pattern.value}
                 )
 
         return self._hold_signal(symbol, timestamp, close, lot_size, "No SLK or CRT entry criteria met", storyline)
@@ -784,4 +1088,3 @@ class PriceActionStrategy:
         data["take_profit"] = take_profits
         data["lot_size"] = lot_sizes
         return data
-

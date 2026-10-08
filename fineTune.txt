@@ -1,0 +1,25 @@
+
+undersatanding how to identify Bias..
+when we have a  sweep and a break of structure on a higher timeframe (either weekly, daily, 4hour) in a bullish trend.. that means market is shifting its bias to Bearish so wwe target more of sells in the expansion phase and the other way round for the market shifting to the bullish side from a bearish downtrend...
+
+note:::: Basics of Key Levels 
+A shaped key or bearish open close level is used for sells opportunity unless proving otherwise (got disrespected to the upside then it can be used to push market to the upside)
+V shaped key or bullish open close level is used for buys opportunity unless proving otherwise (got disrespected to the downside then it can be used to push market to the downside)
+
+
+
+I want us to fine tune somethings to filter more of our trades (Plug and Play)---- continuation setup.
+
+ A shape key level or bearish open close  that have sponsored some sells( for looking buy scenario ) that got disrespected to the upside.. then we can wait for price to comebackt to the A shaped key level or V shape key level sponsored some buys (for looking for sell scenario) then we can wait for price to comebackt to the V shaped key level or bullish open close then we find our entry, when a liquidity is resting close to the A shaped key level  that got disrespected, the two candles that gave this liquidity formation will give us either v shaped or a shaped depending on the Bias.. than this key level that the liquidiy candles created we can place our entry there and set our stop loss few pips below the wick of the candle that swept the previous candle. if any of this key levels that got disrespected is overlapping inside of an imbalance, we consider it high probability setup, that means on the bearish scenario if we have a liquidity resting above the A shaped key level, we start executing trade for a bullish scenario, and the other way round for the bearish scenario.. 
+ 
+ so if the setup for the dirstion occur on a particular level then we can go a time frame lower or 2 time frame lower to get the enrty.. 
+
+this setup can be filter in this timeframse. daily, 4hr 2hr 1hr, 30mins, 15mins 
+
+so we can set tps at the next level or liquidity (either internal or external range liquidity)
+
+
+
+and we can sharpen the candle range theory setup..
+
+also mix this setups with the fibonacci retracement, candle pattern formation(engulfing, hamari, morning star, evening star, doji and more) 
