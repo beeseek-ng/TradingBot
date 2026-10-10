@@ -72,7 +72,7 @@ ensure_mt5_terminal() {
         start_xvfb
         mkdir -p "$mt5_dir"
         curl -sSL -o /tmp/mt5setup.exe https://download.mql5.com/cdn/web/metaquotes.software.corp/mt5/mt5setup.exe
-        WINEDEBUG=-all WINEPREFIX="$WINE_PREFIX_DIR" DISPLAY=:99 wine /tmp/mt5setup.exe /auto || true
+        WINEDEBUG=-all WINEPREFIX="$WINE_PREFIX_DIR" DISPLAY=:99 timeout 60 wine /tmp/mt5setup.exe /auto || true
         rm -f /tmp/mt5setup.exe
     fi
     configure_mt5_autotrading
